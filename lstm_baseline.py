@@ -15,6 +15,7 @@ from tqdm import tqdm
 from time import time
 from nltk.tokenize import RegexpTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 np.random.seed(0)
 #torch.manual_seed(0)
@@ -80,6 +81,7 @@ print "elapsed time: %.2f sec" %(toc - tic)
 print "loading embeddings..."
 tic = time()
 embeddings, word_to_idx = get_embeddings()
+print "vocab size (embeddings): ", len(word_to_idx)
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
@@ -110,7 +112,8 @@ print "embeddings size: ", embeddings.shape
 print "generating training, validation, test datasets..."
 tic = time()
 train_data = []
-for idx in tqdm(range(train_idx_df.shape[0])):
+for idx in tqdm(range(10)):
+#for idx in tqdm(range(train_idx_df.shape[0])):
     query_id = train_idx_df.loc[idx, 'query_id']
     similar_id_list = map(int, train_idx_df.loc[idx, 'similar_id'].split(' '))
     random_id_list = map(int, train_idx_df.loc[idx, 'random_id'].split(' '))
@@ -153,6 +156,63 @@ for idx in tqdm(range(train_idx_df.shape[0])):
         train_data.append(sample)
     #end for
 #end for
-
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
+
+
+#training parameters
+num_epochs = 32 
+batch_size = 8 
+
+#model parameters
+embed_dim = embeddings.shape[1] #200
+hidden_dim = embed_dim / 2 
+weight_decay = 1e-3 
+learning_rate = 1e-3 
+
+#RNN architecture
+class RNN(nn.Module):
+    
+    def __init__(self, embed_dim, hidden_dim, vocab_size):
+        super(RNN, self).__init__()
+        self.hidden_dim = hidden_dim
+
+        self.embedding_layer = nn.Embedding(vocab_size, embed_dim)
+        self.embedding_layer.weight.data = torch.from_numpy(embeddings)
+        self.lstm = nn.LSTM(embed_dim, hidden_dim)
+    
+    def init_hidden(self):
+        #[num_layers, minibatch_size, hidden_dim]
+        return (autograd.Variable(torch.zeros(1, 1, self.hidden_dim)),
+                autograd.Variable(torch.zeros(1, 1, self.hidden_dim)))
+
+    def forward(self, x_idx):
+        all_x = self.embedding_layer(x_idx)   
+        lstm_out, self.hidden = self.lstm(all_x.view(len(x_idx),1,-1), self.hidden)
+        return self.hidden 
+        
+use_gpu = torch.cuda.is_available()
+
+model = RNN(embed_dim, hidden_dim, len(word_to_idx))
+if use_gpu:
+    print "found CUDA GPU..."
+    model = model.cuda()
+    
+print model
+
+#define loss and optimizer
+criterion = nn.MarginRankingLoss(margin=1, size_average=True)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
+
+
+
+
+
+
+
+
+
+
+
+
