@@ -23,6 +23,8 @@ train_test_file_name = data_train_test.dat
 [data_params]
 MAX_TITLE_LEN = 20
 MAX_BODY_LEN = 100
+TRAIN_SAMPLE_SIZE = -1
+# -1 if you want to run it on the entire data set extracted in extracted_data_file_name. Use any other small number like 10/100 to prepare a train-set of 10/100 data points and test your workflow.
 
 [rnn_params]
 # add your RNN params here
