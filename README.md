@@ -15,6 +15,7 @@ This is the format of config.ini that you'll have to follow.
 data_path = <PATH TO THE DATA FOLDER ON YOUR LOCAL MACHINE>
 save_path = <PATH WHERE YOU WANT TO SAVE THE INTERMEDIATE DATA FILES>
 root_path = <CWD OF YOUR CODEBASE>
+embeddings_path = <PATH TO EMBEDDINGS FILE ON YOUR LOCAL MACHINE>
 
 [data_params]
 MAX_TITLE_LEN = 20
