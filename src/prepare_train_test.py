@@ -71,15 +71,16 @@ for idx in tqdm(range(TRAIN_SAMPLE_SIZE)):
         for ridx, random_id in enumerate(random_id_list):
             random_title_name = 'random_title_' + str(ridx)
             random_body_name = 'random_body_' + str(ridx)
-        
+            
             random_title = train_text_df[train_text_df['id'] == random_id].title.tolist() 
             random_body = train_text_df[train_text_df['id'] == random_id].body.tolist()
-            random_title_tokens = tokenizer.tokenize(random_title[0])[:MAX_TITLE_LEN]
-            random_body_tokens = tokenizer.tokenize(random_body[0])[:MAX_BODY_LEN]
-            random_title_tensor_idx = get_tensor_idx(random_title_tokens, word_to_idx, MAX_TITLE_LEN) 
-            random_body_tensor_idx = get_tensor_idx(random_body_tokens, word_to_idx, MAX_BODY_LEN)
-            sample[random_title_name] = random_title_tensor_idx
-            sample[random_body_name] = random_body_tensor_idx
+            if len(random_title) > 0:
+                random_title_tokens = tokenizer.tokenize(random_title[0])[:MAX_TITLE_LEN]
+                random_body_tokens = tokenizer.tokenize(random_body[0])[:MAX_BODY_LEN]
+                random_title_tensor_idx = get_tensor_idx(random_title_tokens, word_to_idx, MAX_TITLE_LEN) 
+                random_body_tensor_idx = get_tensor_idx(random_body_tokens, word_to_idx, MAX_BODY_LEN)
+                sample[random_title_name] = random_title_tensor_idx
+                sample[random_body_name] = random_body_tensor_idx
         #end for
         train_data.append(sample)
     #end for
