@@ -114,8 +114,6 @@ print "vocab size: ", len(vocab)
 print "embeddings size: ", embeddings.shape
 """
 
-"""
-
 print "generating training, validation, test datasets..."
 tic = time()
 train_data = []
@@ -173,35 +171,37 @@ batch_size = 8
 
 #model parameters
 embed_dim = embeddings.shape[1] #200
-hidden_dim = embed_dim / 2 
+hidden_size = 32 # number of LSTM cells 
 weight_decay = 1e-3 
 learning_rate = 1e-3 
 
 #RNN architecture
 class RNN(nn.Module):
     
-    def __init__(self, embed_dim, hidden_dim, vocab_size):
+    def __init__(self, embed_dim, hidden_size, vocab_size, batch_size):
         super(RNN, self).__init__()
-        self.hidden_dim = hidden_dim
+        self.hidden_size = hidden_size
+        self.batch_size = batch_size
 
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim)
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
-        self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=32, batch_first=False)
-        #TODO: check number of cells
+        self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, batch_first=True)
+        self.hidden = self.init_hidden()
     
     def init_hidden(self):
-        #[num_layers, minibatch_size, hidden_dim]
-        return (autograd.Variable(torch.zeros(1, 1, self.hidden_dim)),
-                autograd.Variable(torch.zeros(1, 1, self.hidden_dim)))
+        #[num_layers, batch_size, hidden_size] for (h_n, c_n)
+        return (Variable(torch.zeros(1, self.batch_size, self.hidden_size)),
+                Variable(torch.zeros(1, self.batch_size, self.hidden_size)))
 
     def forward(self, x_idx):
         all_x = self.embedding_layer(x_idx)   
-        lstm_out, self.hidden = self.lstm(all_x.view(len(x_idx),1,-1), self.hidden)
-        return self.hidden 
+        lstm_out, self.hidden = self.lstm(all_x.view(self.batch_size, len(x_idx), -1), self.hidden)
+        h_n, c_n = self.hidden[0], self.hidden[1]
+        return h_n 
         
 use_gpu = torch.cuda.is_available()
 
-model = RNN(embed_dim, hidden_dim, len(word_to_idx))
+model = RNN(embed_dim, hidden_size, len(word_to_idx), batch_size)
 if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
@@ -272,7 +272,6 @@ for epoch in range(num_epochs):
     torch.save(model, SAVE_PATH)
 #end for
 
-"""
 
 """
 #generate plots
