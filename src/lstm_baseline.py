@@ -13,9 +13,11 @@ from torch.autograd import Variable
 
 from tqdm import tqdm
 from time import time
+import cPickle as pickle
+from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import cosine_similarity #use torch.nn.CosineSimilarity
 
 np.random.seed(0)
 #torch.manual_seed(0)
@@ -24,10 +26,11 @@ DATA_PATH = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
 
 SAVE_PATH = './lstm_baseline.pt' 
 EMBEDDINGS_FILE = DATA_PATH + '/vector/vectors_pruned.200.txt'
-MAX_TITLE_LEN = 20
+MAX_TITLE_LEN = 10
 MAX_BODY_LEN = 100  #max number of words per sentence
 
 tokenizer = RegexpTokenizer(r'\w+')
+stop = set(stopwords.words('english'))
 
 def get_embeddings():
     lines = []
@@ -65,6 +68,8 @@ train_text_file = DATA_PATH + '/text_tokenized.txt'
 train_text_df = pd.read_table(train_text_file, sep='\t', header=None)
 train_text_df.columns = ['id', 'title', 'body']
 train_text_df = train_text_df.dropna()
+train_text_df['title'] = train_text_df['title'].apply(lambda words: ' '.join(filter(lambda x: x not in stop, words.split())))
+train_text_df['body'] = train_text_df['body'].apply(lambda words: ' '.join(filter(lambda x: x not in stop, words.split())))
 train_text_df['title_len'] = train_text_df['title'].apply(lambda words: len(tokenizer.tokenize(str(words))))
 train_text_df['body_len'] = train_text_df['body'].apply(lambda words: len(tokenizer.tokenize(str(words))))
 
@@ -94,7 +99,7 @@ ax1.axvline(x=MAX_TITLE_LEN, color='k', linestyle='--', label='max len')
 ax2.axvline(x=MAX_BODY_LEN, color='k', linestyle='--', label='max len')
 ax1.set_title('title length histogram'); ax1.legend(loc=1); 
 ax2.set_title('body length histogram'); ax2.legend(loc=1);
-plt.savefig('./figures/question_len_hist.png')
+plt.savefig('../figures/question_len_hist.png')
 
 """
 print "fitting tf-idf vectorizer..."
@@ -107,6 +112,8 @@ print "elapsed time: %.2f sec" %(toc - tic)
 vocab = tfidf.vocabulary_
 print "vocab size: ", len(vocab)
 print "embeddings size: ", embeddings.shape
+"""
+
 """
 
 print "generating training, validation, test datasets..."
@@ -264,6 +271,8 @@ for epoch in range(num_epochs):
     
     torch.save(model, SAVE_PATH)
 #end for
+
+"""
 
 """
 #generate plots

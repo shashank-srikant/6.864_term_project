@@ -43,7 +43,7 @@ def get_embeddings():
 ###################################################################
 #load data
 print "loading data..."
-stop = stopwords.words('english')
+stop = set(stopwords.words('english')) #faster membership checking with a set
 tic = time()
 train_text_file = DATA_PATH + 'texts_raw_fixed.txt'
 train_text_df = pd.read_table(train_text_file, sep='\t', header=None)
