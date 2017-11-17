@@ -17,7 +17,6 @@ import cPickle as pickle
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity #use torch.nn.CosineSimilarity
 
 np.random.seed(0)
 #torch.manual_seed(0)
@@ -194,10 +193,12 @@ class RNN(nn.Module):
                 Variable(torch.zeros(1, self.batch_size, self.hidden_size)))
 
     def forward(self, x_idx):
-        all_x = self.embedding_layer(x_idx)   
-        lstm_out, self.hidden = self.lstm(all_x.view(self.batch_size, len(x_idx), -1), self.hidden)
+        all_x = self.embedding_layer(x_idx)
+        #import pdb; pdb.set_trace()
+        lstm_out, self.hidden = self.lstm(all_x.view(self.batch_size, x_idx.size(1), -1), self.hidden)
+        #h_n dim: [1, batch_size, hidden_size]
         h_n, c_n = self.hidden[0], self.hidden[1]
-        return h_n 
+        return h_n.squeeze(0) 
         
 use_gpu = torch.cuda.is_available()
 
@@ -209,7 +210,8 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-criterion = nn.MarginRankingLoss(margin=1, size_average=True)
+#criterion = nn.MarginRankingLoss(margin=2, size_average=True)
+criterion = nn.MultiMarginLoss(p=1, margin=2, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 training_loss = []
@@ -231,20 +233,29 @@ for epoch in range(num_epochs):
         
     for batch in tqdm(train_data_loader):
       
-        #TODO: reshape to batches in the middle or use batch_first=True!
         query_title = Variable(batch['query_title'])
         query_body = Variable(batch['query_body'])
         similar_title = Variable(batch['similar_title'])
         similar_body = Variable(batch['similar_body'])
-        #TODO: for loop over random_title and random_body
+
+        random_title_list = []
+        random_body_list = []
+        for ridx in range(10):  #range(100)
+            random_title_name = 'random_title_' + str(ridx)
+            random_body_name = 'random_body_' + str(ridx)
+            random_title_list.append(Variable(batch[random_title_name]))
+            random_body_list.append(Variable(batch[random_body_name]))
 
         if use_gpu:
             query_title, query_body = query_title.cuda(), query_body.cuda()
             similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
-            #TODO: for loop over random_title and random_body
+            random_title_list = map(lambda item: item.cuda(), random_title_list)
+            random_body_list = map(lambda item: item.cuda(), random_body_list)
         
         optimizer.zero_grad()
         model.hidden = model.init_hidden()
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
 
         lstm_query_title = model(query_title)
         lstm_query_body = model(query_body)
@@ -254,12 +265,28 @@ for epoch in range(num_epochs):
         lstm_similar_body = model(similar_body)
         lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
 
-        #TODO: for loop over random_title and random_body
-
+        lstm_random_list = []
+        for ridx in range(len(random_title_list)):
+            lstm_random_title = model(random_title_list[ridx])
+            lstm_random_body = model(random_body_list[ridx])
+            lstm_random = (lstm_random_title + lstm_random_body)/2.0
+            lstm_random_list.append(lstm_random)
+           
+        cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
         score_pos = cosine_similarity(lstm_query, lstm_similar)
-        #TODO: score_neg
 
-        loss = criterion([score_pos, score_neg], 1) #y=1
+        score_list = []
+        score_list.append(score_pos)
+        for ridx in range(len(lstm_random_list)):
+            score_neg = cosine_similarity(lstm_query, lstm_random_list[ridx])
+            score_list.append(score_neg)
+
+        import pdb; pdb.set_trace()
+        X_scores = torch.stack(score_list, 0)
+        y_targets = torch.zeros(X_scores.size(1)).type(torch.LongTensor)
+        if use_gpu:
+            y_targets = y_targets.cuda()
+        loss = criterion(X_scores, y_targets) #y=0
         loss.backward()
         optimizer.step()
                 
