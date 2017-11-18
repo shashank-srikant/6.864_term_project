@@ -30,6 +30,27 @@ def compute_mrr(data_frame, score_name='bm25_score'):
     #end for
     return mrr_output
 
+def precision_at_k(data_frame, K=5, score_name='bm25_score'):
+
+    pr_output = []
+    for qidx in range(data_frame.shape[0]):
+        retrieved_set = map(int, data_frame.loc[qidx, 'random_id'].split(' '))
+        relevant_set = set(map(int, data_frame.loc[qidx, 'similar_id'].split(' '))) 
+        retrieved_scores = map(float, data_frame.loc[qidx, score_name].split(' '))
+
+        #sort according to scores (higher score is better, i.e. ranked higher)        
+        retrieved_set_sorted = [p for p, s in sorted(zip(retrieved_set, retrieved_scores),
+                                key = lambda pair: pair[1], reverse=True)]
+
+        count = 0
+        for item in retrieved_set_sorted[:K]:
+            if item in relevant_set:
+                count += 1
+        #end for
+        precision_at_k = count / float(K)
+        pr_output.append(precision_at_k)
+    #end for
+    return pr_output
 
 #load data
 print "loading data..."
@@ -54,6 +75,16 @@ bm25_mrr_dev = compute_mrr(dev_idx_df, score_name='bm25_score')
 bm25_mrr_test = compute_mrr(test_idx_df, score_name='bm25_score')
 print "bm25 MRR (dev): ", np.mean(bm25_mrr_dev)
 print "bm25 MRR (test): ", np.mean(bm25_mrr_test)
+
+bm25_pr1_dev = precision_at_k(dev_idx_df, K=1, score_name='bm25_score')
+bm25_pr1_test = precision_at_k(test_idx_df, K=1, score_name='bm25_score')
+print "bm25 P@1 (dev): ", np.mean(bm25_pr1_dev)
+print "bm25 P@1 (test): ", np.mean(bm25_pr1_test)
+
+bm25_pr5_dev = precision_at_k(dev_idx_df, K=5, score_name='bm25_score')
+bm25_pr5_test = precision_at_k(test_idx_df, K=5, score_name='bm25_score')
+print "bm25 P@5 (dev): ", np.mean(bm25_pr5_dev)
+print "bm25 P@5 (test): ", np.mean(bm25_pr5_test)
 
 
 
