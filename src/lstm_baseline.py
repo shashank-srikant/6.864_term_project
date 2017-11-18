@@ -281,9 +281,9 @@ for epoch in range(num_epochs):
             score_neg = cosine_similarity(lstm_query, lstm_random_list[ridx])
             score_list.append(score_neg)
 
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
-        y_targets = torch.zeros(X_scores.size(0)).type(torch.LongTensor) #[batch_size]
+        y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
         if use_gpu:
             y_targets = y_targets.cuda()
         loss = criterion(X_scores, y_targets) #y_target=0
