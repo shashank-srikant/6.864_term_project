@@ -282,11 +282,11 @@ for epoch in range(num_epochs):
             score_list.append(score_neg)
 
         import pdb; pdb.set_trace()
-        X_scores = torch.stack(score_list, 0)
-        y_targets = torch.zeros(X_scores.size(1)).type(torch.LongTensor)
+        X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
+        y_targets = torch.zeros(X_scores.size(0)).type(torch.LongTensor) #[batch_size]
         if use_gpu:
             y_targets = y_targets.cuda()
-        loss = criterion(X_scores, y_targets) #y=0
+        loss = criterion(X_scores, y_targets) #y_target=0
         loss.backward()
         optimizer.step()
                 
@@ -299,6 +299,8 @@ for epoch in range(num_epochs):
     torch.save(model, SAVE_PATH)
 #end for
 
+#TODO: dev / test dataset
+#TODO: ranking metrics
 
 """
 #generate plots
