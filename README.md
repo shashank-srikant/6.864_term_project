@@ -30,11 +30,11 @@ TRAIN_SAMPLE_SIZE = -1
 # add your CNN params here
 ```
 
-To execute code:
+On placing ```config.ini``` in the ```src``` folder, execute code:
 ```
->>> run extract_data.py
->>> run prepare_train_test.py
->>> run <model_name>.py #where model_name is {cnn, lstm}
+>>> python extract_data.py
+>>> python prepare_train_test.py
+>>> python <model_name>.py #where model_name is {cnn, lstm}
 ```
 
 # Dataset
