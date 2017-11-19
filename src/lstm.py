@@ -17,7 +17,7 @@ from time import time
 import cPickle as pickle
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
-from sklearn.feature_extraction.text import TfidfVectorizer
+from ranking_metrics import compute_mrr, precision_at_k, compute_map
 
 np.random.seed(0)
 #torch.manual_seed(0)
@@ -40,95 +40,15 @@ print "loading pickled data..."
 tic = time()
 with open(data_filename) as f:  
     train_text_df, train_idx_df, dev_idx_df, test_idx_df, embeddings, word_to_idx = pickle.load(f)
+f.close()
 with open(train_test_filename) as f:
     train_data, val_data, test_data = pickle.load(f)
+f.close()
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
-
-def compute_mrr(data_frame, score_name='bm25_score'):
-
-    mrr_output = []
-    for qidx in range(data_frame.shape[0]):
-        retrieved_set = map(int, data_frame.loc[qidx, 'random_id'].split(' '))
-        relevant_set = set(map(int, data_frame.loc[qidx, 'similar_id'].split(' ')))
-        retrieved_scores = map(float, data_frame.loc[qidx, score_name].split(' '))
-
-        #sort according to scores (higher score is better, i.e. ranked higher)        
-        retrieved_set_sorted = [p for p, s in sorted(zip(retrieved_set, retrieved_scores),
-                                key = lambda pair: pair[1], reverse=True)]
-
-        rank = 1
-        for item in retrieved_set_sorted:
-            if item in relevant_set:
-                break
-            else:
-                rank += 1
-        #end for
-        MRR = 1.0 / rank
-        mrr_output.append(MRR)
-    #end for
-    return mrr_output
-
-def precision_at_k(data_frame, K=5, score_name='bm25_score'):
-
-    pr_output = []
-    for qidx in range(data_frame.shape[0]):
-        retrieved_set = map(int, data_frame.loc[qidx, 'random_id'].split(' '))
-        relevant_set = set(map(int, data_frame.loc[qidx, 'similar_id'].split(' '))) 
-        retrieved_scores = map(float, data_frame.loc[qidx, score_name].split(' '))
-
-        #sort according to scores (higher score is better, i.e. ranked higher)        
-        retrieved_set_sorted = [p for p, s in sorted(zip(retrieved_set, retrieved_scores),
-                                key = lambda pair: pair[1], reverse=True)]
-
-        count = 0
-        for item in retrieved_set_sorted[:K]:
-            if item in relevant_set:
-                count += 1
-        #end for
-        precision_at_k = count / float(K)
-        pr_output.append(precision_at_k)
-    #end for
-    return pr_output
-
-def compute_map(data_frame, score_name='bm25_score'):
-
-    map_output = []
-    for qidx in range(data_frame.shape[0]):
-        retrieved_set = map(int, data_frame.loc[qidx, 'random_id'].split(' '))
-        relevant_set = set(map(int, data_frame.loc[qidx, 'similar_id'].split(' '))) 
-        retrieved_scores = map(float, data_frame.loc[qidx, score_name].split(' '))
-
-        #sort according to scores (higher score is better, i.e. ranked higher)        
-        retrieved_set_sorted = [p for p, s in sorted(zip(retrieved_set, retrieved_scores),
-                                key = lambda pair: pair[1], reverse=True)]
-
-        AP = 0
-        num_relevant = 0
-        for ridx, item in enumerate(retrieved_set_sorted):
-            if item in relevant_set:
-                num_relevant += 1
-                #compute precision at K=ridx+1
-                count = 0
-                for entry in retrieved_set_sorted[:ridx+1]:
-                    if entry in relevant_set:
-                        count += 1
-                #end for
-                AP += count / float(ridx+1)
-            #end if
-        #end for
-        if (num_relevant > 0):
-            AP = AP / float(num_relevant)
-        else:
-            AP = 0
-        #end for
-        map_output.append(AP)
-    #end for
-    return map_output
-
 
 #visualize data
 f, (ax1, ax2) = plt.subplots(1, 2)
@@ -140,18 +60,7 @@ ax1.set_title('title length histogram'); ax1.legend(loc=1);
 ax2.set_title('body length histogram'); ax2.legend(loc=1);
 plt.savefig('../figures/question_len_hist.png')
 
-"""
-print "fitting tf-idf vectorizer..."
-tic = time()
-tfidf = TfidfVectorizer(tokenizer=tokenizer.tokenize, analyzer='word', ngram_range=(1,1))
-tfidf.fit(train_text_df['title'].tolist() + train_text_df['body'].tolist())
-toc = time()
-print "elapsed time: %.2f sec" %(toc - tic)
-
-vocab = tfidf.vocabulary_
-print "vocab size: ", len(vocab)
-print "embeddings size: ", embeddings.shape
-"""
+import pdb; pdb.set_trace()
 
 #training parameters
 num_epochs = 32 
@@ -202,7 +111,7 @@ criterion = nn.MultiMarginLoss(p=1, margin=2, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 training_loss, validation_loss, test_loss = [], [], []
-"""
+
 print "training..."
 for epoch in range(num_epochs):
     
@@ -289,6 +198,7 @@ model = torch.load(SAVE_PATH + SAVE_NAME)
 if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
+"""
 
 print "scoring test questions..."
 running_test_loss = 0.0
@@ -384,7 +294,6 @@ lstm_map_test = compute_map(test_idx_df, score_name='lstm_score')
 print "lstm map (test): ", np.mean(lstm_map_test)
 
 
-
 """
 #generate plots
 plt.figure()
@@ -393,7 +302,7 @@ plt.title("LSTM Model Training Loss")
 plt.xlabel("Epoch")
 plt.ylabel("Training Loss")
 plt.legend()
-plt.savefig('./figures/training_loss.png')
+plt.savefig('../figures/training_loss.png')
 
 plt.figure()
 plt.plot(validation_loss, label='Adam')
@@ -403,6 +312,4 @@ plt.ylabel("Validation Loss")
 plt.legend()
 plt.savefig('./figures/validation_loss.png')
 """
-
-        
 
