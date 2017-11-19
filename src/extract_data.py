@@ -17,7 +17,9 @@ DATA_PATH = config.get('paths', 'data_path')
 SAVE_PATH = config.get('paths', 'save_path')
 EMBEDDINGS_FILE = config.get('paths', 'embeddings_path')
 DATA_FILE_NAME = config.get('paths', 'extracted_data_file_name')
+
 tokenizer = RegexpTokenizer(r'\w+')
+stop = set(stopwords.words('english')) #faster membership checking with a set
 
 ###############################################
 def get_embeddings():
@@ -43,26 +45,35 @@ def get_embeddings():
 ###################################################################
 #load data
 print "loading data..."
-stop = set(stopwords.words('english')) #faster membership checking with a set
 tic = time()
-train_text_file = DATA_PATH + 'texts_raw_fixed.txt'
+train_text_file = DATA_PATH + '/text_tokenized.txt'
 train_text_df = pd.read_table(train_text_file, sep='\t', header=None)
 train_text_df.columns = ['id', 'title', 'body']
 train_text_df = train_text_df.dropna()
-train_text_df['title_len'] = train_text_df['title'].apply(lambda words: len(tokenizer.tokenize(str(words))))
-train_text_df['body_len'] = train_text_df['body'].apply(lambda words: len(tokenizer.tokenize(str(words))))
 train_text_df['title'] = train_text_df['title'].apply(lambda words:' '.join(filter(lambda x: x not in stop,  words.split())))
 train_text_df['body'] = train_text_df['body'].apply(lambda words: ' '.join(filter(lambda x: x not in stop,  words.split())))
-train_text_df['title_no_stpwrds_len'] = train_text_df['title'].apply(lambda words: len(tokenizer.tokenize(str(words))))
-train_text_df['body_no_stpwrds_len'] = train_text_df['body'].apply(lambda words: len(tokenizer.tokenize(str(words))))
+train_text_df['title_len'] = train_text_df['title'].apply(lambda words: len(tokenizer.tokenize(str(words))))
+train_text_df['body_len'] = train_text_df['body'].apply(lambda words: len(tokenizer.tokenize(str(words))))
 
 train_idx_file = DATA_PATH + '/train_random.txt' 
 train_idx_df = pd.read_table(train_idx_file, sep='\t', header=None)
 train_idx_df.columns = ['query_id', 'similar_id', 'random_id']
+train_idx_df = train_idx_df.dropna()
+train_idx_df = train_idx_df.reset_index()
 
 dev_idx_file = DATA_PATH + '/dev.txt'
 dev_idx_df = pd.read_table(dev_idx_file, sep='\t', header=None)
-dev_idx_df.columns = ['query_id', 'similar_id', 'retrieved_id', 'bm25_score']
+#dev_idx_df.columns = ['query_id', 'similar_id', 'retrieved_id', 'bm25_score']
+dev_idx_df.columns = ['query_id', 'similar_id', 'random_id', 'bm25_score']
+dev_idx_df = dev_idx_df.dropna()
+dev_idx_df = dev_idx_df.reset_index()
+
+test_idx_file = DATA_PATH + '/test.txt'
+test_idx_df = pd.read_table(test_idx_file, sep='\t', header=None)
+#test_idx_df.columns = ['query_id', 'similar_id', 'retrieved_id', 'bm25_score']
+test_idx_df.columns = ['query_id', 'similar_id', 'random_id', 'bm25_score']
+test_idx_df = test_idx_df.dropna()
+test_idx_df = test_idx_df.reset_index()
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
@@ -76,4 +87,4 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 filename = SAVE_PATH + DATA_FILE_NAME
 with open(filename, 'w') as f:
-    pickle.dump([train_text_df, train_idx_df, dev_idx_df, embeddings, word_to_idx], f)
+    pickle.dump([train_text_df, train_idx_df, dev_idx_df, test_idx_df, embeddings, word_to_idx], f)
