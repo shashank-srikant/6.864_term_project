@@ -92,6 +92,7 @@ class RNN(nn.Module):
 
     def forward(self, x_idx):
         all_x = self.embedding_layer(x_idx)
+        #[batch_size, seq_length (num_words), embed_dim]
         lstm_out, self.hidden = self.lstm(all_x.view(self.batch_size, x_idx.size(1), -1), self.hidden)
         #h_n dim: [1, batch_size, hidden_size]
         h_n, c_n = self.hidden[0], self.hidden[1]
@@ -135,7 +136,7 @@ for epoch in range(num_epochs):
 
         random_title_list = []
         random_body_list = []
-        for ridx in range(10):  #range(100)
+        for ridx in range(100): #number of random (negative) examples 
             random_title_name = 'random_title_' + str(ridx)
             random_body_name = 'random_body_' + str(ridx)
             random_title_list.append(Variable(batch[random_title_name]))
@@ -147,25 +148,53 @@ for epoch in range(num_epochs):
             random_title_list = map(lambda item: item.cuda(), random_title_list)
             random_body_list = map(lambda item: item.cuda(), random_body_list)
         
-        optimizer.zero_grad() #TODO: check how often to reset this
-        model.hidden = model.init_hidden() #TODO: check how often to reset this
+        optimizer.zero_grad() 
+
+        #query title
+        model.hidden = model.init_hidden() 
         if use_gpu:
             model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-
         lstm_query_title = model(query_title)
+
+        #query body
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_query_body = model(query_body)
+
         lstm_query = (lstm_query_title + lstm_query_body)/2.0
 
+        #similar title
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_similar_title = model(similar_title)
+
+        #similar body
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_similar_body = model(similar_body)
+
         lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
 
         lstm_random_list = []
         for ridx in range(len(random_title_list)):
+            #random title
+            model.hidden = model.init_hidden() 
+            if use_gpu:
+                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
             lstm_random_title = model(random_title_list[ridx])
+
+            #random body
+            model.hidden = model.init_hidden() 
+            if use_gpu:
+                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
             lstm_random_body = model(random_body_list[ridx])
+
             lstm_random = (lstm_random_title + lstm_random_body)/2.0
             lstm_random_list.append(lstm_random)
+        #end for
            
         cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
         score_pos = cosine_similarity(lstm_query, lstm_similar)
@@ -222,7 +251,7 @@ for batch in tqdm(test_data_loader):
 
     random_title_list = []
     random_body_list = []
-    for ridx in range(10):  #range(20)
+    for ridx in range(20): #number of retrieved (bm25) examples 
         random_title_name = 'random_title_' + str(ridx)
         random_body_name = 'random_body_' + str(ridx)
         random_title_list.append(Variable(batch[random_title_name]))
@@ -233,25 +262,52 @@ for batch in tqdm(test_data_loader):
         similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
         random_title_list = map(lambda item: item.cuda(), random_title_list)
         random_body_list = map(lambda item: item.cuda(), random_body_list)
-        
-    model.hidden = model.init_hidden() #TODO: check how often to reset this!!
+
+    #query title
+    model.hidden = model.init_hidden() 
     if use_gpu:
         model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-
     lstm_query_title = model(query_title)
+
+    #query body
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
     lstm_query_body = model(query_body)
+
     lstm_query = (lstm_query_title + lstm_query_body)/2.0
 
+    #similar title
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
     lstm_similar_title = model(similar_title)
+
+    #similar body
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
     lstm_similar_body = model(similar_body)
+
     lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
 
     lstm_random_list = []
     for ridx in range(len(random_title_list)):
+        #random title
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_random_title = model(random_title_list[ridx])
+
+        #random body
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_random_body = model(random_body_list[ridx])
+
         lstm_random = (lstm_random_title + lstm_random_body)/2.0
         lstm_random_list.append(lstm_random)
+    #end for
            
     cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
     score_pos = cosine_similarity(lstm_query, lstm_similar)
@@ -269,7 +325,7 @@ for batch in tqdm(test_data_loader):
     loss = criterion(X_scores, y_targets) #y_target=0
     running_test_loss += loss.cpu().data[0]        
     
-    #save scores to data-frame
+    #save scores to data frame
     lstm_query_idx = query_idx.cpu().numpy()
     lstm_retrieved_scores = X_scores.cpu().data.numpy()[:,1:] #skip positive score
     for row, qidx in enumerate(lstm_query_idx):
