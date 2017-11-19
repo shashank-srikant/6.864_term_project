@@ -1,48 +1,190 @@
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.utils.data as data
+import torch.autograd as autograd
+from torch.autograd import Variable
+import ConfigParser
+import cPickle as pickle
+from time import time
+
+config = ConfigParser.ConfigParser()
+config.readfp(open(r'../src/config.ini'))
+SAVE_PATH = config.get('paths', 'save_path')
+TRAIN_TEST_FILE_NAME = "data_train_test_100.dat"
+filename = SAVE_PATH + TRAIN_TEST_FILE_NAME
+with open(filename) as f:  # Python 3: open(..., 'rb')
+    train_data = pickle.load(f)
+
+DATA_FILE_NAME = config.get('paths', 'extracted_data_file_name')
+filename = SAVE_PATH + DATA_FILE_NAME
+
+tic1 = time()
+with open(filename) as f:  # Python 3: open(..., 'rb')
+    train_text_df, train_idx_df, dev_idx_df, embeddings, word_to_idx = pickle.load(f)
+del train_text_df
+del train_idx_df
+del dev_idx_df
+
 class  CNN(nn.Module):
-    def __init__ (self, sequence_length, num_classes, vocab_size, embedding_size, filter_sizes, num_filters, l2_reg_lambda=0.0):
-        # sequence_length – The length of our sentences. Remember that we padded all our sentences to have the same length (59 for our data set).
-        # num_classes – Number of classes in the output layer, two in our case (positive and negative).
-        # vocab_size – The size of our vocabulary. This is needed to define the size of our embedding layer, which will have shape [vocabulary_size, embedding_size].
-        # embedding_size – The dimensionality of our embeddings.
-        # filter_sizes – The number of words we want our convolutional filters to cover. We will have num_filters for each size specified here. For example, [3, 4, 5] means that we will have filters that slide over 3, 4 and 5 words respectively, for a total of 3 * num_filters filters.
-        # num_filters – The number of filters per filter size (see above).
+    def __init__(self, embed_num, embed_dim, kernel_num, kernel_sizes):
+        super(CNN,self).__init__()
+        V = embed_num
+        D = embed_dim
+        Ci = 1
+        Co = kernel_num
+        Ks = kernel_sizes
+
+        self.embed = nn.Embedding(V, D)
+        self.embed.weight.data = torch.from_numpy(embeddings)
+        self.convs1 = nn.ModuleList([nn.Conv2d(Ci, Co, (K, D)) for K in Ks])
+        #self.dropout = nn.Dropout(dropout)
+
+    def conv_and_pool(self, x, conv):
+        x = F.relu(conv(x)).squeeze(3) #(N,Co,W)
+        x = F.max_pool1d(x, x.size(2)).squeeze(2)
+        return x
 
 
-        self.input_x = tf.placeholder(tf.int32, [None, sequence_length], name="input_x")
-        self.input_y = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
-        self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
-        self.embedded_chars_expanded =  nn.Embedding(vocab_size, embedding_size)
+    def forward(self, x):
+        #print "begin: "+str(x.size())
+        x = self.embed(x) # (N,W,D)
+        #print "after embedding: "+ str(x.size())
+        #if self.args.static:
+        #    x = Variable(x)
 
-        # Create a convolution + maxpool layer for each filter size
-        pooled_outputs = []
-        for i, filter_size in enumerate(filter_sizes):
-            with tf.name_scope("conv-maxpool-%s" % filter_size):
-                # Convolution Layer
-                filter_shape = [filter_size, embedding_size, 1, num_filters]
-                W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="W")
-                b = tf.Variable(tf.constant(0.1, shape=[num_filters]), name="b")
-                conv = tf.nn.conv2d(
-                    self.embedded_chars_expanded,
-                    W,
-                    strides=[1, 1, 1, 1],
-                    padding="VALID",
-                    name="conv")
-                # Apply nonlinearity
-                h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
-                # Maxpooling over the outputs
-                pooled = tf.nn.max_pool(
-                    h,
-                    ksize=[1, sequence_length - filter_size + 1, 1, 1],
-                    strides=[1, 1, 1, 1],
-                    padding='VALID',
-                    name="pool")
-                pooled_outputs.append(pooled)
+        x = x.unsqueeze(1) # (N,Ci,W,D)
+        #print "after unsqueeze: "+ str(x.size())
+        x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1] #[(N,Co,W), ...]*len(Ks)
+        #print x
+        #print "after relu: "+ str(len(x)) + "::" + str(x[0].size())+ "::" + str(x[1].size())
 
-        # Combine all the pooled features
-        num_filters_total = num_filters * len(filter_sizes)
-        self.h_pool = tf.concat(pooled_outputs, 3)
-        self.h_pool_flat = tf.reshape(self.h_pool, [-1, num_filters_total])
+        x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x] #[(N,Co), ...]*len(Ks)
+        #print x
+        #print "after max_pool1d: "+ str(len(x)) + "::" + str(x[0].size())+ "::" + str(x[1].size())
+        
+        x = torch.cat(x, 1)
+        #print "after torch cat final step: "+ str(x.size())
+        #print "---"
+        #sys.exit(0)
+        #x = self.dropout(x) # (N,len(Ks)*Co)
+        return x
 
-        # Add dropout
-        with tf.name_scope("dropout"):
-            self.h_drop = tf.nn.dropout(self.h_pool_flat, self.dropout_keep_prob)
+embed_num = len(word_to_idx)
+embed_dim = len(embeddings[0])
+kernel_num = 100
+kernel_sizes = range(3,10)
+batch_size = 50
+model = CNN(embed_num, embed_dim, kernel_num, kernel_sizes)
+
+learning_rate = 1e-4
+weight_decay = 1e2
+print model
+
+#define loss and optimizer
+criterion = nn.MultiMarginLoss(p=1, margin=2, size_average=True)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
+training_loss = []
+validation_loss = []
+
+
+print "training..."
+num_epochs = 1
+for epoch in range(num_epochs):
+    
+    running_train_loss = 0.0
+    
+    train_data_loader = torch.utils.data.DataLoader(
+        train_data, 
+        batch_size = batch_size,
+        shuffle = True,
+        num_workers = 4, 
+        drop_last = True)
+        
+    model.train()
+    count_batch = 0    
+    for batch in train_data_loader:
+        count_batch += 1
+        print "::batch begin::"
+        query_title = Variable(batch['query_title'])
+        query_body = Variable(batch['query_body'])
+        similar_title = Variable(batch['similar_title'])
+        similar_body = Variable(batch['similar_body'])
+        
+        random_title_list = []
+        random_body_list = []
+        for ridx in range(10):  #range(100)
+            random_title_name = 'random_title_' + str(ridx)
+            random_body_name = 'random_body_' + str(ridx)
+            random_title_list.append(Variable(batch[random_title_name]))
+            random_body_list.append(Variable(batch[random_body_name]))
+        
+        if count_batch  == 0:
+            break
+            
+        optimizer.zero_grad()
+        print "::query title::" 
+        lstm_query_title = model(query_title)
+        print "::query body::" 
+        lstm_query_body = model(query_body)
+        lstm_query = (lstm_query_title + lstm_query_body)/2.0
+        
+        print "::query similar title::" 
+        lstm_similar_title = model(similar_title)
+        print "::query similar body::" 
+        lstm_similar_body = model(similar_body)
+        lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
+        
+        
+        lstm_random_list = []
+        print "::random title body process::" 
+        
+        for ridx in range(len(random_title_list)):
+            lstm_random_title = model(random_title_list[ridx])
+            lstm_random_body = model(random_body_list[ridx])
+            lstm_random = (lstm_random_title + lstm_random_body)/2.0
+            lstm_random_list.append(lstm_random)
+            #lstm_random_list.append(lstm_random_body)
+            
+        
+        print "done random processing.."
+        cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+        score_pos = cosine_similarity(lstm_query, lstm_similar)
+
+        score_list = []
+        score_list1 = []
+        
+        score_list.append(score_pos)
+        score_list1.append(score_pos.data.numpy())
+        print "::query random title body::" 
+        for ridx in range(len(lstm_random_list)):
+            score_neg = cosine_similarity(lstm_query, lstm_random_list[ridx])
+            score_list.append(score_neg)
+            score_list1.append(score_neg.data.numpy())
+        
+        print "::done scoring::"
+        
+        diff = score_list1[0] - np.median(score_list1[1:])
+        plt.plot(diff)
+        plt.show()
+        
+        X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
+        y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
+        loss = criterion(X_scores, y_targets) #y_target=0
+        loss.backward()
+        optimizer.step()
+        
+        print "::batch end::"
+        running_train_loss += loss.cpu().data[0]        
+        
+    #end for
+    training_loss.append(running_train_loss)
+    print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
+    
+    #torch.save(model, SAVE_PATH)
+#end for

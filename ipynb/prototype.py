@@ -1,30 +1,16 @@
 import numpy as np
 import pandas as pd
-
 import seaborn as sns
 import matplotlib.pyplot as plt
-import cPickle as pickle
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data
 import torch.autograd as autograd
 from torch.autograd import Variable
-
-from tqdm import tqdm
-from time import time
-from nltk.tokenize import RegexpTokenizer
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-####
-import os
-from os.path import dirname, realpath
-import sys
-sys.path.append(dirname(os.getcwd()))
-import nltk as nk
-from nltk.corpus import stopwords
-import dill
 import ConfigParser
+import cPickle as pickle
+from time import time
 
 config = ConfigParser.ConfigParser()
 config.readfp(open(r'../src/config.ini'))
@@ -40,8 +26,6 @@ filename = SAVE_PATH + DATA_FILE_NAME
 tic1 = time()
 with open(filename) as f:  # Python 3: open(..., 'rb')
     train_text_df, train_idx_df, dev_idx_df, embeddings, word_to_idx = pickle.load(f)
-
-
 del train_text_df
 del train_idx_df
 del dev_idx_df
@@ -94,7 +78,7 @@ embed_num = len(word_to_idx)
 embed_dim = len(embeddings[0])
 kernel_num = 100
 kernel_sizes = range(3,10)
-batch_size = 64
+batch_size = 50
 model = CNN(embed_num, embed_dim, kernel_num, kernel_sizes)
 
 learning_rate = 1e-4
@@ -123,8 +107,9 @@ for epoch in range(num_epochs):
         drop_last = True)
         
     model.train()
-        
+    count_batch = 0    
     for batch in train_data_loader:
+        count_batch += 1
         print "::batch begin::"
         query_title = Variable(batch['query_title'])
         query_body = Variable(batch['query_body'])
@@ -139,6 +124,9 @@ for epoch in range(num_epochs):
             random_title_list.append(Variable(batch[random_title_name]))
             random_body_list.append(Variable(batch[random_body_name]))
         
+        if count_batch  == 0:
+            break
+            
         optimizer.zero_grad()
         print "::query title::" 
         lstm_query_title = model(query_title)
@@ -155,11 +143,14 @@ for epoch in range(num_epochs):
         
         lstm_random_list = []
         print "::random title body process::" 
+        
         for ridx in range(len(random_title_list)):
             lstm_random_title = model(random_title_list[ridx])
             lstm_random_body = model(random_body_list[ridx])
             lstm_random = (lstm_random_title + lstm_random_body)/2.0
             lstm_random_list.append(lstm_random)
+            #lstm_random_list.append(lstm_random_body)
+            
         
         print "done random processing.."
         cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
@@ -175,26 +166,25 @@ for epoch in range(num_epochs):
             score_neg = cosine_similarity(lstm_query, lstm_random_list[ridx])
             score_list.append(score_neg)
             score_list1.append(score_neg.data.numpy())
-
+        
         print "::done scoring::"
-        '''
+        
         diff = score_list1[0] - np.median(score_list1[1:])
         plt.plot(diff)
         plt.show()
-        '''
-        '''
+        
         X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
         y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
         loss = criterion(X_scores, y_targets) #y_target=0
         loss.backward()
         optimizer.step()
-        '''
+        
         print "::batch end::"
-        #running_train_loss += loss.cpu().data[0]        
+        running_train_loss += loss.cpu().data[0]        
         
     #end for
-    #training_loss.append(running_train_loss)
-    #print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
+    training_loss.append(running_train_loss)
+    print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
     
     #torch.save(model, SAVE_PATH)
 #end for
