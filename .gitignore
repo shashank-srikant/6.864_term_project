@@ -2,3 +2,4 @@ data/
 /src/config.ini
 *~
 .ipynb_checkpoints
+/ipynb/.ipynb_checkpoints
