@@ -1,10 +1,7 @@
 # 6.864_term_project
 Term project for 6.864 - Advanced NLP
 
-# Dependencies   
-PyTorch   
-
-# Installation
+# Instructions
 Once you've downloaded the repository, you will need to create a config.ini in the /src folder.
 This file will contain all parameters that will be picked up at run-time. These include paths to your data folder etc.
 Python 2.x provides the ConfigReader module which we use to parse this file.
@@ -21,7 +18,7 @@ extracted_data_file_name = data_raw.dat
 train_test_file_name = data_train_test.dat
 
 [data_params]
-MAX_TITLE_LEN = 20
+MAX_TITLE_LEN = 10
 MAX_BODY_LEN = 100
 TRAIN_SAMPLE_SIZE = -1
 # -1 if you want to run it on the entire data set extracted in extracted_data_file_name. Use any other small number like 10/100 to prepare a train-set of 10/100 data points and test your workflow.
@@ -32,3 +29,18 @@ TRAIN_SAMPLE_SIZE = -1
 [cnn_params]
 # add your CNN params here
 ```
+
+To execute code:
+```
+>>> run extract_data.py
+>>> run prepare_train_test.py
+>>> run <model_name>.py #where model_name is {cnn, lstm}
+```
+
+# Dataset
+
+The AskUbuntu Question Dataset is available at: https://github.com/taolei87/askubuntu
+
+
+# Dependencies   
+PyTorch 0.2.0_3   

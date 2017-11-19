@@ -11,7 +11,6 @@ import torch.utils.data as data
 import torch.autograd as autograd
 from torch.autograd import Variable
 
-import ConfigParser
 from tqdm import tqdm
 from time import time
 import cPickle as pickle
@@ -22,28 +21,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 np.random.seed(0)
 #torch.manual_seed(0)
 
-config = ConfigParser.ConfigParser()
-config.readfp(open(r'config.ini'))
+DATA_PATH = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
 
-SAVE_PATH = config.get('paths', 'save_path')
-DATA_FILE_NAME = config.get('paths', 'extracted_data_file_name')
-TRAIN_TEST_FILE_NAME = config.get('paths', 'train_test_file_name')
-SAVE_NAME = config.get('rnn_params', 'save_name')
-
-MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
-MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
-
-data_filename = SAVE_PATH + DATA_FILE_NAME
-train_test_filename = SAVE_PATH + TRAIN_TEST_FILE_NAME
-
-print "loading pickled data..."
-tic = time()
-with open(data_filename) as f:  
-    train_text_df, train_idx_df, dev_idx_df, test_idx_df, embeddings, word_to_idx = pickle.load(f)
-with open(train_test_filename) as f:
-    train_data, val_data, test_data = pickle.load(f)
-toc = time()
-print "elapsed time: %.2f sec" %(toc - tic)
+SAVE_PATH = './lstm_baseline.pt' 
+EMBEDDINGS_FILE = DATA_PATH + '/vector/vectors_pruned.200.txt'
+MAX_TITLE_LEN = 10
+MAX_BODY_LEN = 100  #max number of words per sentence
 
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
@@ -130,6 +113,131 @@ def compute_map(data_frame, score_name='bm25_score'):
     return map_output
 
 
+def get_embeddings():
+    lines = []
+    with open(EMBEDDINGS_FILE, 'r') as f:
+        lines = f.readlines()
+        f.close()
+    
+    embedding_tensor = []
+    word_to_idx = {}
+    
+    for idx, l in enumerate(lines):
+        word, emb = l.split()[0], l.split()[1:]
+        vector = [float(x) for x in emb]
+        if idx == 0: #reserved
+            embedding_tensor.append(np.zeros(len(vector)))
+        embedding_tensor.append(vector)
+        word_to_idx[word] = idx+1
+    #end for
+    embedding_tensor = np.array(embedding_tensor, dtype=np.float32)    
+    return embedding_tensor, word_to_idx
+        
+def get_tensor_idx(text, word_to_idx, max_len):
+    null_idx = 0  #idx if word is not in the embeddings dictionary
+    text_idx = [word_to_idx[x] if x in word_to_idx else null_idx for x in text][:max_len]
+    if len(text_idx) < max_len:
+        text_idx.extend([null_idx for _ in range(max_len - len(text_idx))])    
+    x = torch.LongTensor(text_idx)  #64-bit integer
+    return x
+        
+def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, type='train'):
+
+    dataset = []
+    for idx in tqdm(range(100)):
+    #for idx in tqdm(range(data_frame.shape[0])):
+        query_id = data_frame.loc[idx, 'query_id']
+        similar_id_list = map(int, data_frame.loc[idx, 'similar_id'].split(' '))
+        random_id_list = map(int, data_frame.loc[idx, 'random_id'].split(' '))
+    
+        #query title and body tensor ids
+        query_title = train_text_df[train_text_df['id'] == query_id].title.tolist() 
+        query_body = train_text_df[train_text_df['id'] == query_id].body.tolist()
+        query_title_tokens = tokenizer.tokenize(query_title[0])[:MAX_TITLE_LEN]
+        query_body_tokens = tokenizer.tokenize(query_body[0])[:MAX_BODY_LEN]
+        query_title_tensor_idx = get_tensor_idx(query_title_tokens, word_to_idx, MAX_TITLE_LEN) 
+        query_body_tensor_idx = get_tensor_idx(query_body_tokens, word_to_idx, MAX_BODY_LEN)
+
+        if (type != 'train'):
+            similar_id_list = similar_id_list[:1] #keep only one element
+
+        for similar_id in similar_id_list:
+            sample = {}  #reset sample dictionary here
+            sample['query_idx'] = query_id
+            sample['query_title'] = query_title_tensor_idx
+            sample['query_body'] = query_body_tensor_idx
+
+            similar_title = train_text_df[train_text_df['id'] == similar_id].title.tolist() 
+            similar_body = train_text_df[train_text_df['id'] == similar_id].body.tolist()
+            similar_title_tokens = tokenizer.tokenize(similar_title[0])[:MAX_TITLE_LEN]
+            similar_body_tokens = tokenizer.tokenize(similar_body[0])[:MAX_BODY_LEN]
+            similar_title_tensor_idx = get_tensor_idx(similar_title_tokens, word_to_idx, MAX_TITLE_LEN) 
+            similar_body_tensor_idx = get_tensor_idx(similar_body_tokens, word_to_idx, MAX_BODY_LEN)
+            sample['similar_title'] = similar_title_tensor_idx
+            sample['similar_body'] = similar_body_tensor_idx
+
+            for ridx, random_id in enumerate(random_id_list):
+                random_title_name = 'random_title_' + str(ridx)
+                random_body_name = 'random_body_' + str(ridx)
+        
+                random_title = train_text_df[train_text_df['id'] == random_id].title.tolist() 
+                random_body = train_text_df[train_text_df['id'] == random_id].body.tolist()
+                random_title_tokens = tokenizer.tokenize(random_title[0])[:MAX_TITLE_LEN]
+                random_body_tokens = tokenizer.tokenize(random_body[0])[:MAX_BODY_LEN]
+                random_title_tensor_idx = get_tensor_idx(random_title_tokens, word_to_idx, MAX_TITLE_LEN) 
+                random_body_tensor_idx = get_tensor_idx(random_body_tokens, word_to_idx, MAX_BODY_LEN)
+                sample[random_title_name] = random_title_tensor_idx
+                sample[random_body_name] = random_body_tensor_idx
+            #end for
+            dataset.append(sample)
+        #end for
+    #end for
+    return dataset 
+
+
+#load data
+print "loading data..."
+tic = time()
+train_text_file = DATA_PATH + '/text_tokenized.txt'
+train_text_df = pd.read_table(train_text_file, sep='\t', header=None)
+train_text_df.columns = ['id', 'title', 'body']
+train_text_df = train_text_df.dropna()
+train_text_df['title'] = train_text_df['title'].apply(lambda words: ' '.join(filter(lambda x: x not in stop, words.split())))
+train_text_df['body'] = train_text_df['body'].apply(lambda words: ' '.join(filter(lambda x: x not in stop, words.split())))
+train_text_df['title_len'] = train_text_df['title'].apply(lambda words: len(tokenizer.tokenize(str(words))))
+train_text_df['body_len'] = train_text_df['body'].apply(lambda words: len(tokenizer.tokenize(str(words))))
+
+train_idx_file = DATA_PATH + '/train_random.txt' 
+train_idx_df = pd.read_table(train_idx_file, sep='\t', header=None)
+train_idx_df.columns = ['query_id', 'similar_id', 'random_id']
+train_idx_df = train_idx_df.dropna()
+train_idx_df = train_idx_df.reset_index()
+
+dev_idx_file = DATA_PATH + '/dev.txt'
+dev_idx_df = pd.read_table(dev_idx_file, sep='\t', header=None)
+#dev_idx_df.columns = ['query_id', 'similar_id', 'retrieved_id', 'bm25_score']
+dev_idx_df.columns = ['query_id', 'similar_id', 'random_id', 'bm25_score']
+dev_idx_df = dev_idx_df.dropna()
+dev_idx_df = dev_idx_df.reset_index()
+
+test_idx_file = DATA_PATH + '/test.txt'
+test_idx_df = pd.read_table(test_idx_file, sep='\t', header=None)
+#test_idx_df.columns = ['query_id', 'similar_id', 'retrieved_id', 'bm25_score']
+test_idx_df.columns = ['query_id', 'similar_id', 'random_id', 'bm25_score']
+test_idx_df = test_idx_df.dropna()
+test_idx_df = test_idx_df.reset_index()
+
+toc = time()
+print "elapsed time: %.2f sec" %(toc - tic)
+
+print "loading embeddings..."
+tic = time()
+embeddings, word_to_idx = get_embeddings()
+print "vocab size (embeddings): ", len(word_to_idx)
+toc = time()
+print "elapsed time: %.2f sec" %(toc - tic)
+
+
 #visualize data
 f, (ax1, ax2) = plt.subplots(1, 2)
 sns.distplot(train_text_df['title_len'], hist=True, kde=True, color='b', label='title len', ax=ax1)
@@ -152,6 +260,15 @@ vocab = tfidf.vocabulary_
 print "vocab size: ", len(vocab)
 print "embeddings size: ", embeddings.shape
 """
+
+print "generating training, validation, test datasets..."
+tic = time()
+train_data = generate_data(train_idx_df, train_text_df, word_to_idx, tokenizer, type='train')
+val_data = generate_data(dev_idx_df, train_text_df, word_to_idx, tokenizer, type='dev')
+test_data = generate_data(test_idx_df, train_text_df, word_to_idx, tokenizer, type='test')
+toc = time()
+print "elapsed time: %.2f sec" %(toc - tic)
+
 
 #training parameters
 num_epochs = 32 
@@ -281,11 +398,12 @@ for epoch in range(num_epochs):
     training_loss.append(running_train_loss)
     print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
     
-    torch.save(model, SAVE_PATH + SAVE_NAME)
+    torch.save(model, SAVE_PATH)
 #end for
 """
+
 print "loading pre-trained model..."
-model = torch.load(SAVE_PATH + SAVE_NAME)
+model = torch.load(SAVE_PATH)
 if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
@@ -405,4 +523,9 @@ plt.savefig('./figures/validation_loss.png')
 """
 
         
+            
+
+
+
+
 
