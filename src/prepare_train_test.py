@@ -88,8 +88,8 @@ def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, num_samples
                     sample[random_body_name] = random_body_tensor_idx
                 else:
                     #generate a vector of all zeros (need 100 negative examples for each batch)
-                    sample[random_title_name] = torch.zeros(MAX_TITLE_LEN).astype(torch.LongTensor) 
-                    sample[random_body_name] = torch.zeros(MAX_BODY_LEN).astype(torch.LongTensor)
+                    sample[random_title_name] = torch.zeros(MAX_TITLE_LEN).type(torch.LongTensor) 
+                    sample[random_body_name] = torch.zeros(MAX_BODY_LEN).type(torch.LongTensor)
                 #end if
             #end for
             dataset.append(sample)
