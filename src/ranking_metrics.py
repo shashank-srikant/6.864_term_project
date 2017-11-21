@@ -87,45 +87,46 @@ def compute_map(data_frame, score_name='bm25_score'):
     #end for
     return map_output
 
-#load data
-print "loading data..."
+if __name__ == "__main__":
 
-dev_idx_file = DATA_PATH + '/dev.txt'
-dev_idx_df = pd.read_table(dev_idx_file, sep='\t', header=None)
-#dev_idx_df.columns = ['query_id', 'similar_id', 'retrieved_id', 'bm25_score']
-dev_idx_df.columns = ['query_id', 'similar_id', 'random_id', 'bm25_score']
-dev_idx_df = dev_idx_df.dropna()
-dev_idx_df = dev_idx_df.reset_index()
+    #load data
+    print "loading data..."
 
-test_idx_file = DATA_PATH + '/test.txt'
-test_idx_df = pd.read_table(test_idx_file, sep='\t', header=None)
-#test_idx_df.columns = ['query_id', 'similar_id', 'retrieved_id', 'bm25_score']
-test_idx_df.columns = ['query_id', 'similar_id', 'random_id', 'bm25_score']
-test_idx_df = test_idx_df.dropna()
-test_idx_df = test_idx_df.reset_index()
+    dev_idx_file = DATA_PATH + '/dev.txt'
+    dev_idx_df = pd.read_table(dev_idx_file, sep='\t', header=None)
+    #dev_idx_df.columns = ['query_id', 'similar_id', 'retrieved_id', 'bm25_score']
+    dev_idx_df.columns = ['query_id', 'similar_id', 'random_id', 'bm25_score']
+    dev_idx_df = dev_idx_df.dropna()
+    dev_idx_df = dev_idx_df.reset_index()
 
-print "computing ranking metrics..."
+    test_idx_file = DATA_PATH + '/test.txt'
+    test_idx_df = pd.read_table(test_idx_file, sep='\t', header=None)
+    #test_idx_df.columns = ['query_id', 'similar_id', 'retrieved_id', 'bm25_score']
+    test_idx_df.columns = ['query_id', 'similar_id', 'random_id', 'bm25_score']
+    test_idx_df = test_idx_df.dropna()
+    test_idx_df = test_idx_df.reset_index()
 
-bm25_mrr_dev = compute_mrr(dev_idx_df, score_name='bm25_score')
-bm25_mrr_test = compute_mrr(test_idx_df, score_name='bm25_score')
-print "bm25 MRR (dev): ", np.mean(bm25_mrr_dev)
-print "bm25 MRR (test): ", np.mean(bm25_mrr_test)
+    print "computing ranking metrics..."
 
-bm25_pr1_dev = precision_at_k(dev_idx_df, K=1, score_name='bm25_score')
-bm25_pr1_test = precision_at_k(test_idx_df, K=1, score_name='bm25_score')
-print "bm25 P@1 (dev): ", np.mean(bm25_pr1_dev)
-print "bm25 P@1 (test): ", np.mean(bm25_pr1_test)
+    bm25_mrr_dev = compute_mrr(dev_idx_df, score_name='bm25_score')
+    bm25_mrr_test = compute_mrr(test_idx_df, score_name='bm25_score')
+    print "bm25 MRR (dev): ", np.mean(bm25_mrr_dev)
+    print "bm25 MRR (test): ", np.mean(bm25_mrr_test)
 
-bm25_pr5_dev = precision_at_k(dev_idx_df, K=5, score_name='bm25_score')
-bm25_pr5_test = precision_at_k(test_idx_df, K=5, score_name='bm25_score')
-print "bm25 P@5 (dev): ", np.mean(bm25_pr5_dev)
-print "bm25 P@5 (test): ", np.mean(bm25_pr5_test)
+    bm25_pr1_dev = precision_at_k(dev_idx_df, K=1, score_name='bm25_score')
+    bm25_pr1_test = precision_at_k(test_idx_df, K=1, score_name='bm25_score')
+    print "bm25 P@1 (dev): ", np.mean(bm25_pr1_dev)
+    print "bm25 P@1 (test): ", np.mean(bm25_pr1_test)
 
-bm25_map_dev = compute_map(dev_idx_df, score_name='bm25_score')
-bm25_map_test = compute_map(test_idx_df, score_name='bm25_score')
-print "bm25 map (dev): ", np.mean(bm25_map_dev)
-print "bm25 map (test): ", np.mean(bm25_map_test)
+    bm25_pr5_dev = precision_at_k(dev_idx_df, K=5, score_name='bm25_score')
+    bm25_pr5_test = precision_at_k(test_idx_df, K=5, score_name='bm25_score')
+    print "bm25 P@5 (dev): ", np.mean(bm25_pr5_dev)
+    print "bm25 P@5 (test): ", np.mean(bm25_pr5_test)
 
+    bm25_map_dev = compute_map(dev_idx_df, score_name='bm25_score')
+    bm25_map_test = compute_map(test_idx_df, score_name='bm25_score')
+    print "bm25 map (dev): ", np.mean(bm25_map_dev)
+    print "bm25 map (test): ", np.mean(bm25_map_test)
 
 
 

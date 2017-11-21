@@ -23,7 +23,7 @@ np.random.seed(0)
 
 DATA_PATH = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
 
-SAVE_PATH = './lstm_baseline.pt' 
+SAVE_PATH = './lstm_baseline_100.pt' 
 EMBEDDINGS_FILE = DATA_PATH + '/vector/vectors_pruned.200.txt'
 MAX_TITLE_LEN = 10
 MAX_BODY_LEN = 100  #max number of words per sentence
@@ -182,12 +182,19 @@ def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, type='train
         
                 random_title = train_text_df[train_text_df['id'] == random_id].title.tolist() 
                 random_body = train_text_df[train_text_df['id'] == random_id].body.tolist()
-                random_title_tokens = tokenizer.tokenize(random_title[0])[:MAX_TITLE_LEN]
-                random_body_tokens = tokenizer.tokenize(random_body[0])[:MAX_BODY_LEN]
-                random_title_tensor_idx = get_tensor_idx(random_title_tokens, word_to_idx, MAX_TITLE_LEN) 
-                random_body_tensor_idx = get_tensor_idx(random_body_tokens, word_to_idx, MAX_BODY_LEN)
-                sample[random_title_name] = random_title_tensor_idx
-                sample[random_body_name] = random_body_tensor_idx
+                
+                if (len(random_title) > 0 and len(random_body) > 0):
+                    random_title_tokens = tokenizer.tokenize(random_title[0])[:MAX_TITLE_LEN]
+                    random_body_tokens = tokenizer.tokenize(random_body[0])[:MAX_BODY_LEN]
+                    random_title_tensor_idx = get_tensor_idx(random_title_tokens, word_to_idx, MAX_TITLE_LEN) 
+                    random_body_tensor_idx = get_tensor_idx(random_body_tokens, word_to_idx, MAX_BODY_LEN)
+                    sample[random_title_name] = random_title_tensor_idx
+                    sample[random_body_name] = random_body_tensor_idx
+                else:
+                    #generate a vector of all zeros (need 100 negative examples for each batch)
+                    sample[random_title_name] = torch.zeros(MAX_TITLE_LEN).type(torch.LongTensor) 
+                    sample[random_body_name] = torch.zeros(MAX_BODY_LEN).type(torch.LongTensor)
+                #end if
             #end for
             dataset.append(sample)
         #end for
@@ -237,7 +244,7 @@ print "vocab size (embeddings): ", len(word_to_idx)
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
-
+"""
 #visualize data
 f, (ax1, ax2) = plt.subplots(1, 2)
 sns.distplot(train_text_df['title_len'], hist=True, kde=True, color='b', label='title len', ax=ax1)
@@ -247,6 +254,7 @@ ax2.axvline(x=MAX_BODY_LEN, color='k', linestyle='--', label='max len')
 ax1.set_title('title length histogram'); ax1.legend(loc=1); 
 ax2.set_title('body length histogram'); ax2.legend(loc=1);
 plt.savefig('../figures/question_len_hist.png')
+"""
 
 """
 print "fitting tf-idf vectorizer..."
@@ -272,11 +280,11 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 #training parameters
 num_epochs = 32 
-batch_size = 16 
+batch_size = 64 
 
 #model parameters
 embed_dim = embeddings.shape[1] #200
-hidden_size = 32 # number of LSTM cells 
+hidden_size = 240 # number of LSTM cells 
 weight_decay = 1e-3 
 learning_rate = 1e-3 
 
@@ -288,6 +296,7 @@ class RNN(nn.Module):
         self.hidden_size = hidden_size
         self.batch_size = batch_size
 
+        #TODO: how to make sure loss is not computed for 0 padded values
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim) #TODO: make non-trainable
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, batch_first=True)
@@ -319,7 +328,7 @@ criterion = nn.MultiMarginLoss(p=1, margin=2, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 training_loss, validation_loss, test_loss = [], [], []
-"""
+
 print "training..."
 for epoch in range(num_epochs):
     
@@ -335,7 +344,7 @@ for epoch in range(num_epochs):
     model.train()
         
     for batch in tqdm(train_data_loader):
-      
+     
         query_title = Variable(batch['query_title'])
         query_body = Variable(batch['query_body'])
         similar_title = Variable(batch['similar_title'])
@@ -343,7 +352,7 @@ for epoch in range(num_epochs):
 
         random_title_list = []
         random_body_list = []
-        for ridx in range(10):  #range(100)
+        for ridx in range(100): #number of random negative examples
             random_title_name = 'random_title_' + str(ridx)
             random_body_name = 'random_body_' + str(ridx)
             random_title_list.append(Variable(batch[random_title_name]))
@@ -355,25 +364,53 @@ for epoch in range(num_epochs):
             random_title_list = map(lambda item: item.cuda(), random_title_list)
             random_body_list = map(lambda item: item.cuda(), random_body_list)
         
-        optimizer.zero_grad() #TODO: check how often to reset this
-        model.hidden = model.init_hidden() #TODO: check how often to reset this
+        optimizer.zero_grad()
+
+        #query title
+        model.hidden = model.init_hidden() 
         if use_gpu:
             model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-
         lstm_query_title = model(query_title)
+
+        #query body
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_query_body = model(query_body)
+
         lstm_query = (lstm_query_title + lstm_query_body)/2.0
 
+        #similar title
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_similar_title = model(similar_title)
+
+        #similar body
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_similar_body = model(similar_body)
+
         lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
 
         lstm_random_list = []
         for ridx in range(len(random_title_list)):
+            #random title
+            model.hidden = model.init_hidden() 
+            if use_gpu:
+                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
             lstm_random_title = model(random_title_list[ridx])
+
+            #random body
+            model.hidden = model.init_hidden() 
+            if use_gpu:
+                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
             lstm_random_body = model(random_body_list[ridx])
+
             lstm_random = (lstm_random_title + lstm_random_body)/2.0
             lstm_random_list.append(lstm_random)
+        #end for
            
         cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
         score_pos = cosine_similarity(lstm_query, lstm_similar)
@@ -408,6 +445,8 @@ if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
 
+"""
+
 print "scoring test questions..."
 running_test_loss = 0.0
 
@@ -430,7 +469,7 @@ for batch in tqdm(test_data_loader):
 
     random_title_list = []
     random_body_list = []
-    for ridx in range(10):  #range(20)
+    for ridx in range(20): #number of retrieved (bm25) examples
         random_title_name = 'random_title_' + str(ridx)
         random_body_name = 'random_body_' + str(ridx)
         random_title_list.append(Variable(batch[random_title_name]))
@@ -441,25 +480,52 @@ for batch in tqdm(test_data_loader):
         similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
         random_title_list = map(lambda item: item.cuda(), random_title_list)
         random_body_list = map(lambda item: item.cuda(), random_body_list)
-        
-    model.hidden = model.init_hidden() #TODO: check how often to reset this!!
+    
+    #query title
+    model.hidden = model.init_hidden() 
     if use_gpu:
         model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-
     lstm_query_title = model(query_title)
+
+    #query body
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
     lstm_query_body = model(query_body)
+
     lstm_query = (lstm_query_title + lstm_query_body)/2.0
 
+    #similar title
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
     lstm_similar_title = model(similar_title)
+
+    #similar body
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
     lstm_similar_body = model(similar_body)
+
     lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
 
     lstm_random_list = []
     for ridx in range(len(random_title_list)):
+        #random title
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_random_title = model(random_title_list[ridx])
+
+        #random body
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
         lstm_random_body = model(random_body_list[ridx])
+
         lstm_random = (lstm_random_title + lstm_random_body)/2.0
         lstm_random_list.append(lstm_random)
+    #end for
            
     cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
     score_pos = cosine_similarity(lstm_query, lstm_similar)

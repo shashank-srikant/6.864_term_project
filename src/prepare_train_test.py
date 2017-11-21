@@ -25,9 +25,6 @@ MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN')) #max number of words per sentence
 TRAIN_SAMPLE_SIZE = int(config.get('data_params', 'TRAIN_SAMPLE_SIZE')) # can provide any number less than train_idx_df.shape[0] to test your code. Provide -1 if you want to use all of train_idx_df.shape[0]
 
-if TRAIN_SAMPLE_SIZE == -1:
-    TRAIN_SAMPLE_SIZE = train_idx_df.shape[0]
-
 ###################################################################
 def get_tensor_idx(text, word_to_idx, max_len):
     null_idx = 0  #idx if word is not in the embeddings dictionary
@@ -38,10 +35,13 @@ def get_tensor_idx(text, word_to_idx, max_len):
     return x
 ###################################################################
 
-def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, type='train'):
+def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, num_samples, type='train'):
+
+    if num_samples == -1:
+        num_samples = data_frame.shape[0]
 
     dataset = []
-    for idx in tqdm(range(TRAIN_SAMPLE_SIZE)):
+    for idx in tqdm(range(num_samples)):
         query_id = data_frame.loc[idx, 'query_id']
         similar_id_list = map(int, data_frame.loc[idx, 'similar_id'].split(' '))
         random_id_list = map(int, data_frame.loc[idx, 'random_id'].split(' '))
@@ -78,12 +78,19 @@ def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, type='train
         
                 random_title = train_text_df[train_text_df['id'] == random_id].title.tolist() 
                 random_body = train_text_df[train_text_df['id'] == random_id].body.tolist()
-                random_title_tokens = tokenizer.tokenize(random_title[0])[:MAX_TITLE_LEN]
-                random_body_tokens = tokenizer.tokenize(random_body[0])[:MAX_BODY_LEN]
-                random_title_tensor_idx = get_tensor_idx(random_title_tokens, word_to_idx, MAX_TITLE_LEN) 
-                random_body_tensor_idx = get_tensor_idx(random_body_tokens, word_to_idx, MAX_BODY_LEN)
-                sample[random_title_name] = random_title_tensor_idx
-                sample[random_body_name] = random_body_tensor_idx
+
+                if (len(random_title) > 0 and len(random_body) > 0):
+                    random_title_tokens = tokenizer.tokenize(random_title[0])[:MAX_TITLE_LEN]
+                    random_body_tokens = tokenizer.tokenize(random_body[0])[:MAX_BODY_LEN]
+                    random_title_tensor_idx = get_tensor_idx(random_title_tokens, word_to_idx, MAX_TITLE_LEN) 
+                    random_body_tensor_idx = get_tensor_idx(random_body_tokens, word_to_idx, MAX_BODY_LEN)
+                    sample[random_title_name] = random_title_tensor_idx
+                    sample[random_body_name] = random_body_tensor_idx
+                else:
+                    #generate a vector of all zeros (need 100 negative examples for each batch)
+                    sample[random_title_name] = torch.zeros(MAX_TITLE_LEN).type(torch.LongTensor) 
+                    sample[random_body_name] = torch.zeros(MAX_BODY_LEN).type(torch.LongTensor)
+                #end if
             #end for
             dataset.append(sample)
         #end for
@@ -93,10 +100,10 @@ def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, type='train
 
 tokenizer = RegexpTokenizer(r'\w+')
 print "generating training, validation, test datasets..."
-tic = time()
-train_data = generate_data(train_idx_df, train_text_df, word_to_idx, tokenizer, type='train')
-val_data = generate_data(dev_idx_df, train_text_df, word_to_idx, tokenizer, type='dev')
-test_data = generate_data(test_idx_df, train_text_df, word_to_idx, tokenizer, type='test')
+tic = time() 
+train_data = generate_data(train_idx_df, train_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, type='train')
+val_data = generate_data(dev_idx_df, train_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, type='dev')
+test_data = generate_data(test_idx_df, train_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, type='test')
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 ###################################################################
