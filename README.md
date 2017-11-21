@@ -40,7 +40,7 @@ On placing ```config.ini``` in the ```src``` folder, execute code:
 # Dataset
 
 The AskUbuntu Question Dataset is available at: https://github.com/taolei87/askubuntu
-
+The Android Stack Exchange dataset is available at: https://github.com/jiangfeng1124/Android
 
 # Dependencies   
 PyTorch 0.2.0_3   
