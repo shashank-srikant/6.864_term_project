@@ -35,24 +35,19 @@ class  CNN(nn.Module):
         super(CNN,self).__init__()
         V = embed_num
         D = embed_dim
-        Ci = 1
-        Co = kernel_num
-        Ks = kernel_sizes
+        Ci = 1 #input channel
+        Co = kernel_num #depth
+        Ks = kernel_sizes #height of each filter
 
         self.embed = nn.Embedding(V, D)
         self.embed.weight.data = torch.from_numpy(embeddings)
         self.convs1 = nn.ModuleList([nn.Conv2d(Ci, Co, (K, D)) for K in Ks])
         #self.dropout = nn.Dropout(dropout)
 
-    def conv_and_pool(self, x, conv):
-        x = F.relu(conv(x)).squeeze(3) #(N,Co,W)
-        x = F.max_pool1d(x, x.size(2)).squeeze(2)
-        return x
-
-
     def forward(self, x):
         #print "begin: "+str(x.size())
         x = self.embed(x) # (N,W,D)
+        
         #print "after embedding: "+ str(x.size())
         #if self.args.static:
         #    x = Variable(x)
@@ -60,15 +55,14 @@ class  CNN(nn.Module):
         x = x.unsqueeze(1) # (N,Ci,W,D)
         #print "after unsqueeze: "+ str(x.size())
         x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1] #[(N,Co,W), ...]*len(Ks)
-        #print x
-        #print "after relu: "+ str(len(x)) + "::" + str(x[0].size())+ "::" + str(x[1].size())
-
+        
+        #print "after relu: "+ str(len(x)) #+ "::" + str(x[0].size())+ "::" + str(x[1].size())
+          
         x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x] #[(N,Co), ...]*len(Ks)
-        #print x
-        #print "after max_pool1d: "+ str(len(x)) + "::" + str(x[0].size())+ "::" + str(x[1].size())
+        #print "after max_pool1d: " + "::" + str(x[0].size())+ str(x[1].size())+"::" + str(x[2].size())
         
         x = torch.cat(x, 1)
-        #print "after torch cat final step: "+ str(x.size())
+        #print "after torch cat final step: "+ "::" + str(x[0].size())+ str(x[1].size())+"::" + str(x[2].size())
         #print "---"
         #sys.exit(0)
         #x = self.dropout(x) # (N,len(Ks)*Co)
@@ -77,12 +71,12 @@ class  CNN(nn.Module):
 embed_num = len(word_to_idx)
 embed_dim = len(embeddings[0])
 kernel_num = 100
-kernel_sizes = range(3,10)
-batch_size = 50
+kernel_sizes = range(2,6)
+batch_size = 32
 model = CNN(embed_num, embed_dim, kernel_num, kernel_sizes)
 
-learning_rate = 1e-4
-weight_decay = 1e2
+learning_rate = 1e-3
+weight_decay = 1e-3
 print model
 
 #define loss and optimizer
@@ -92,9 +86,8 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=
 training_loss = []
 validation_loss = []
 
-
-print "training..."
-num_epochs = 1
+print "Begin training..."
+num_epochs = 10
 for epoch in range(num_epochs):
     
     running_train_loss = 0.0
@@ -107,10 +100,8 @@ for epoch in range(num_epochs):
         drop_last = True)
         
     model.train()
-    count_batch = 0    
+    
     for batch in train_data_loader:
-        count_batch += 1
-        print "::batch begin::"
         query_title = Variable(batch['query_title'])
         query_body = Variable(batch['query_body'])
         similar_title = Variable(batch['similar_title'])
@@ -124,13 +115,10 @@ for epoch in range(num_epochs):
             random_title_list.append(Variable(batch[random_title_name]))
             random_body_list.append(Variable(batch[random_body_name]))
         
-        if count_batch  == 0:
-            break
-            
+        
         optimizer.zero_grad()
-        print "::query title::" 
+        
         lstm_query_title = model(query_title)
-        print "::query body::" 
         lstm_query_body = model(query_body)
         lstm_query = (lstm_query_title + lstm_query_body)/2.0
         
@@ -169,12 +157,16 @@ for epoch in range(num_epochs):
         
         print "::done scoring::"
         
+        '''
         diff = score_list1[0] - np.median(score_list1[1:])
         plt.plot(diff)
         plt.show()
+        '''
         
         X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
+        #y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
         y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
+        
         loss = criterion(X_scores, y_targets) #y_target=0
         loss.backward()
         optimizer.step()
