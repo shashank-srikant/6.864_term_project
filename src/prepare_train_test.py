@@ -23,6 +23,7 @@ TRAIN_TEST_FILE_NAME = config.get('paths', 'train_test_file_name')
 
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN')) #max number of words per sentence
+NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE')) 
 TRAIN_SAMPLE_SIZE = int(config.get('data_params', 'TRAIN_SAMPLE_SIZE')) # can provide any number less than train_idx_df.shape[0] to test your code. Provide -1 if you want to use all of train_idx_df.shape[0]
 
 ###################################################################
@@ -35,7 +36,7 @@ def get_tensor_idx(text, word_to_idx, max_len):
     return x
 ###################################################################
 
-def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, num_samples, type='train'):
+def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, num_samples, num_negative, type='train'):
 
     if num_samples == -1:
         num_samples = data_frame.shape[0]
@@ -72,7 +73,7 @@ def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, num_samples
             sample['similar_title'] = similar_title_tensor_idx
             sample['similar_body'] = similar_body_tensor_idx
 
-            for ridx, random_id in enumerate(random_id_list):
+            for ridx, random_id in enumerate(random_id_list[:num_negative]):
                 random_title_name = 'random_title_' + str(ridx)
                 random_body_name = 'random_body_' + str(ridx)
         
@@ -101,9 +102,9 @@ def generate_data(data_frame, train_text_df, word_to_idx, tokenizer, num_samples
 tokenizer = RegexpTokenizer(r'\w+')
 print "generating training, validation, test datasets..."
 tic = time() 
-train_data = generate_data(train_idx_df, train_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, type='train')
-val_data = generate_data(dev_idx_df, train_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, type='dev')
-test_data = generate_data(test_idx_df, train_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, type='test')
+train_data = generate_data(train_idx_df, train_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, NUM_NEGATIVE, type='train')
+val_data = generate_data(dev_idx_df, train_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, NUM_NEGATIVE, type='dev')
+test_data = generate_data(test_idx_df, train_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, NUM_NEGATIVE, type='test')
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 ###################################################################
