@@ -60,15 +60,13 @@ ax1.set_title('title length histogram'); ax1.legend(loc=1);
 ax2.set_title('body length histogram'); ax2.legend(loc=1);
 plt.savefig('../figures/question_len_hist.png')
 
-import pdb; pdb.set_trace()
-
 #training parameters
-num_epochs = 32 
-batch_size = 16 
+num_epochs = 16 
+batch_size = 4 #16 is OOM
 
 #model parameters
 embed_dim = embeddings.shape[1] #200
-hidden_size = 32 # number of LSTM cells 
+hidden_size = 240 # number of LSTM cells 
 weight_decay = 1e-3 
 learning_rate = 1e-3 
 
@@ -80,6 +78,7 @@ class RNN(nn.Module):
         self.hidden_size = hidden_size
         self.batch_size = batch_size
 
+        #TODO: ignore loss computations on 0 embedding index inputs 
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim) #TODO: make non-trainable
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, batch_first=True)
@@ -336,6 +335,9 @@ print "total test loss: ", running_test_loss
 print "number of NaN: ", test_idx_df.isnull().sum()
 test_idx_df = test_idx_df.dropna() #NaNs are due to restriction: range(100)
 
+#save scored data frame
+test_idx_df.to_csv(SAVE_PATH + '/test_idx_df_scored_lstm.csv', header=True)
+
 print "computing ranking metrics..."
 lstm_mrr_test = compute_mrr(test_idx_df, score_name='lstm_score')
 print "lstm MRR (test): ", np.mean(lstm_mrr_test)
@@ -358,7 +360,7 @@ plt.title("LSTM Model Training Loss")
 plt.xlabel("Epoch")
 plt.ylabel("Training Loss")
 plt.legend()
-plt.savefig('../figures/training_loss.png')
+plt.savefig('../figures/lstm_training_loss.png')
 
 plt.figure()
 plt.plot(validation_loss, label='Adam')
@@ -366,6 +368,6 @@ plt.title("LSTM Model Validation Loss")
 plt.xlabel("Epoch")
 plt.ylabel("Validation Loss")
 plt.legend()
-plt.savefig('./figures/validation_loss.png')
+plt.savefig('./figures/lstm_validation_loss.png')
 """
 
