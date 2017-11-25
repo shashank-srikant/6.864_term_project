@@ -29,6 +29,7 @@ SAVE_PATH = config.get('paths', 'save_path')
 DATA_FILE_NAME = config.get('paths', 'extracted_data_file_name')
 TRAIN_TEST_FILE_NAME = config.get('paths', 'train_test_file_name')
 SAVE_NAME = config.get('rnn_params', 'save_name')
+NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE')) 
 
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
@@ -62,11 +63,11 @@ plt.savefig('../figures/question_len_hist.png')
 
 #training parameters
 num_epochs = 16 
-batch_size = 4 #16 is OOM
+batch_size = 32 #4
 
 #model parameters
 embed_dim = embeddings.shape[1] #200
-hidden_size = 240 # number of LSTM cells 
+hidden_size = 240 #number of LSTM cells 
 weight_decay = 1e-3 
 learning_rate = 1e-3 
 
@@ -135,7 +136,7 @@ for epoch in range(num_epochs):
 
         random_title_list = []
         random_body_list = []
-        for ridx in range(100): #number of random (negative) examples 
+        for ridx in range(NUM_NEGATIVE): #100, number of random (negative) examples 
             random_title_name = 'random_title_' + str(ridx)
             random_body_name = 'random_body_' + str(ridx)
             random_title_list.append(Variable(batch[random_title_name]))
@@ -332,7 +333,7 @@ for batch in tqdm(test_data_loader):
 #end for        
     
 print "total test loss: ", running_test_loss
-print "number of NaN: ", test_idx_df.isnull().sum()
+print "number of NaN: \n", test_idx_df.isnull().sum()
 test_idx_df = test_idx_df.dropna() #NaNs are due to restriction: range(100)
 
 #save scored data frame
