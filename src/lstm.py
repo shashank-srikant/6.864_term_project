@@ -10,6 +10,7 @@ import torch.nn.functional as F
 import torch.utils.data as data
 import torch.autograd as autograd
 from torch.autograd import Variable
+from torch.optim.lr_scheduler import StepLR
 
 import ConfigParser
 from tqdm import tqdm
@@ -69,7 +70,7 @@ batch_size = 32 #4
 embed_dim = embeddings.shape[1] #200
 hidden_size = 240 #number of LSTM cells 
 weight_decay = 1e-3 
-learning_rate = 1e-3 
+learning_rate = 1e-3 #TODO: learning rate schedule
 
 #RNN architecture
 class RNN(nn.Module):
@@ -110,6 +111,7 @@ print model
 #define loss and optimizer
 criterion = nn.MultiMarginLoss(p=1, margin=2, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
 training_loss, validation_loss, test_loss = [], [], []
 
@@ -211,7 +213,7 @@ for epoch in range(num_epochs):
             y_targets = y_targets.cuda()
         loss = criterion(X_scores, y_targets) #y_target=0
         loss.backward()
-        optimizer.step()
+        scheduler.step()
                 
         running_train_loss += loss.cpu().data[0]        
         
