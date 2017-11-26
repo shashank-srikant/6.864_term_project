@@ -26,7 +26,7 @@ config.readfp(open(r'../src/config.ini'))
 SAVE_PATH = config.get('paths', 'save_path')
 DATA_FILE_NAME = config.get('paths', 'extracted_data_file_name')
 TRAIN_TEST_FILE_NAME = config.get('paths', 'train_test_file_name')
-SAVE_NAME = config.get('rnn_params', 'save_name')
+SAVE_NAME = config.get('cnn_params', 'save_name')
 NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE')) 
 
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
@@ -55,7 +55,7 @@ embed_num = len(word_to_idx)
 embed_dim = len(embeddings[0])
 kernel_num = 100  #TODO: tune
 kernel_sizes = range(2,6)
-learning_rate = 1e-3
+learning_rate = 1e-3 #TODO: learning rate schedule
 weight_decay = 1e-3
 
 class  CNN(nn.Module):
@@ -258,6 +258,9 @@ for batch in tqdm(test_data_loader):
 print "total test loss: ", running_test_loss
 print "number of NaN: \n", test_idx_df.isnull().sum()
 test_idx_df = test_idx_df.dropna() #NaNs are due to restriction: range(100)
+
+#save scored data frame
+test_idx_df.to_csv(SAVE_PATH + '/test_idx_df_scored_cnn.csv', header=True)
 
 print "computing ranking metrics..."
 cnn_mrr_test = compute_mrr(test_idx_df, score_name='cnn_score')
