@@ -29,6 +29,7 @@ DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/androi
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
 
+NUM_CLASSES = 2
 config = ConfigParser.ConfigParser()
 config.readfp(open(r'config.ini'))
 SAVE_PATH = config.get('paths', 'save_path')
@@ -38,7 +39,6 @@ EMBEDDINGS_FILE = config.get('paths', 'embeddings_path')
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
 NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE'))
-
 #TODO: do we keep the same title and body len for android dataset?
 
 def get_embeddings():
@@ -285,7 +285,56 @@ if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
 
-model.eval()
+print "creating gradient reversal layer..."
+#GRL architecture
+class GRL(nn.Module):
+    def __init__(self, Lambda):
+        super(GRL, self).__init__()
+        self.Lambda = Lambda
+
+    def forward(self, x):
+        return x
+
+    def backward(self, x):
+        return -self.Lambda * x
+
+
+print "instantiating domain classifier model..."
+#domain classifier architecture
+class DNN(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(DNN, self).__init__()
+        self.input_dim = input_dim
+        self.output_dim = output_dim  #2
+ 
+        self.fc1 = nn.Linear(self.input_dim, 128)
+        self.fc2 = nn.Linear(128, 32)
+        self.fc3 = nn.Linear(32, 8)
+        self.fc4 = nn.Linear(8, self.output_dim)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.fc2(x)
+        x = self.fc3(x)
+        x = self.fc4(x)
+        return x 
+
+#DNN parameters
+dnn_input_dim = hidden_size
+dnn_output_dim = NUM_CLASSES
+domain_clf = DNN(dnn_input_dim, dnn_output_dim)
+if use_gpu:
+    print "found CUDA GPU..."
+    domain_clf = domain_clf.cuda()
+
+print "training..."
+
+
+
+
+
+
+
 
 print "scoring similarity between target questions..."
 y_true, y_pred_lstm = [], []
