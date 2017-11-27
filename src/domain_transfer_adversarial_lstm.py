@@ -242,6 +242,10 @@ toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
 print "loading LSTM model pre-trained on source dataset..."
+#training parameters
+num_epochs = 16 
+batch_size = 32 #4
+
 #RNN architecture
 class RNN(nn.Module):
     def __init__(self, embed_dim, hidden_size, vocab_size, batch_size):
@@ -285,20 +289,6 @@ if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
 
-print "creating gradient reversal layer..."
-#GRL architecture
-class GRL(nn.Module):
-    def __init__(self, Lambda):
-        super(GRL, self).__init__()
-        self.Lambda = Lambda
-
-    def forward(self, x):
-        return x
-
-    def backward(self, x):
-        return -self.Lambda * x
-
-
 print "instantiating domain classifier model..."
 #domain classifier architecture
 class DNN(nn.Module):
@@ -327,15 +317,136 @@ if use_gpu:
     print "found CUDA GPU..."
     domain_clf = domain_clf.cuda()
 
+#define loss and optimizer
+criterion_gen = nn.MultiMarginLoss(p=1, margin=1, size_average=True)
+criterion_dis = nn.CrossEntropyLoss(weight=None, size_average=True)
+optimizer_gen = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr=learning_rate, weight_decay=weight_decay)
+scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
+scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rate every 4 epochs
+
+training_loss, validation_loss, test_loss = [], [], []
+
+#TODO: merge and shuffle train data!
+
 print "training..."
+for epoch in range(num_epochs):
+    
+    running_train_loss = 0.0
+    
+    train_data_loader = torch.utils.data.DataLoader(
+        train_data, 
+        batch_size = batch_size,
+        shuffle = True,
+        num_workers = 4, 
+        drop_last = True)
+        
+    model.train()
+        
+    for batch in tqdm(train_data_loader):
+      
+        query_title = Variable(batch['query_title'])
+        query_body = Variable(batch['query_body'])
+        similar_title = Variable(batch['similar_title'])
+        similar_body = Variable(batch['similar_body'])
 
+        random_title_list = []
+        random_body_list = []
+        for ridx in range(NUM_NEGATIVE): #100, number of random (negative) examples 
+            random_title_name = 'random_title_' + str(ridx)
+            random_body_name = 'random_body_' + str(ridx)
+            random_title_list.append(Variable(batch[random_title_name]))
+            random_body_list.append(Variable(batch[random_body_name]))
 
+        if use_gpu:
+            query_title, query_body = query_title.cuda(), query_body.cuda()
+            similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
+            random_title_list = map(lambda item: item.cuda(), random_title_list)
+            random_body_list = map(lambda item: item.cuda(), random_body_list)
+        
+        optimizer_gen.zero_grad() 
+        optimizer_dis.zero_grad() 
 
+        #query title
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+        lstm_query_title = model(query_title)
 
+        #query body
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+        lstm_query_body = model(query_body)
 
+        lstm_query = (lstm_query_title + lstm_query_body)/2.0
 
+        #similar title
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+        lstm_similar_title = model(similar_title)
 
+        #similar body
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+        lstm_similar_body = model(similar_body)
 
+        lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
+
+        lstm_random_list = []
+        for ridx in range(len(random_title_list)):
+            #random title
+            model.hidden = model.init_hidden() 
+            if use_gpu:
+                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+            lstm_random_title = model(random_title_list[ridx])
+
+            #random body
+            model.hidden = model.init_hidden() 
+            if use_gpu:
+                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+            lstm_random_body = model(random_body_list[ridx])
+
+            lstm_random = (lstm_random_title + lstm_random_body)/2.0
+            lstm_random_list.append(lstm_random)
+        #end for
+           
+        cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+        score_pos = cosine_similarity(lstm_query, lstm_similar)
+
+        score_list = []
+        score_list.append(score_pos)
+        for ridx in range(len(lstm_random_list)):
+            score_neg = cosine_similarity(lstm_query, lstm_random_list[ridx])
+            score_list.append(score_neg)
+
+        X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
+        y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
+        if use_gpu:
+            y_targets = y_targets.cuda()
+        loss_gen = criterion_gen(X_scores, y_targets) #y_target=0
+        loss_gen.backward()
+        scheduler_gen.step()
+                
+        running_train_loss += loss.cpu().data[0]        
+        
+    #end for
+    training_loss.append(running_train_loss)
+    print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
+    
+    torch.save(model, SAVE_PATH + '/adversarial_domain_transfer.pt')
+#end for
+"""
+print "loading pre-trained model..."
+model = torch.load(SAVE_PATH + '/adversarial_domain_transfer.pt')
+if use_gpu:
+    print "found CUDA GPU..."
+    model = model.cuda()
+"""
+
+"""
 print "scoring similarity between target questions..."
 y_true, y_pred_lstm = [], []
 
@@ -468,6 +579,5 @@ plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
 plt.savefig('../figures/domain_transfer_direct_lstm.png')
-
-
+"""
 

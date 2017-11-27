@@ -69,8 +69,8 @@ batch_size = 32 #4
 #model parameters
 embed_dim = embeddings.shape[1] #200
 hidden_size = 240 #number of LSTM cells 
-weight_decay = 1e-3 
-learning_rate = 1e-3 #TODO: learning rate schedule
+weight_decay = 1e-6 
+learning_rate = 1e-3 
 
 #RNN architecture
 class RNN(nn.Module):
@@ -109,7 +109,7 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-criterion = nn.MultiMarginLoss(p=1, margin=2, size_average=True)
+criterion = nn.MultiMarginLoss(p=1, margin=1, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 

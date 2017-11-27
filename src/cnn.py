@@ -56,8 +56,8 @@ embed_num = len(word_to_idx)
 embed_dim = len(embeddings[0])
 kernel_num = 100  #TODO: tune
 kernel_sizes = range(2,6)
-learning_rate = 1e-3 #TODO: learning rate schedule
-weight_decay = 1e-3 #TODO: tune weight decay (too high?)
+learning_rate = 1e-3 
+weight_decay = 1e-6
 
 class  CNN(nn.Module):
     def __init__(self, embed_num, embed_dim, kernel_num, kernel_sizes):
@@ -90,7 +90,7 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-criterion = nn.MultiMarginLoss(p=1, margin=2, size_average=True)
+criterion = nn.MultiMarginLoss(p=1, margin=1, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
