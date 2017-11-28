@@ -69,7 +69,6 @@ def get_tensor_idx(text, word_to_idx, max_len):
     x = torch.LongTensor(text_idx)  #64-bit integer
     return x
 
-#source_pos_data = generate_data_source(source_idx_df, source_text_df, word_to_idx, tokenizer, type='pos')
 def generate_data_source(data_frame, train_text_df, word_to_idx, tokenizer, num_negative, type='pos'):
 
     source_dataset = []
@@ -220,6 +219,8 @@ target_neg_df.columns = ['id_1', 'id_2']
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
+import pdb; pdb.set_trace()
+
 print "loading embeddings..."
 tic = time()
 embeddings, word_to_idx = get_embeddings()
@@ -244,7 +245,7 @@ print "elapsed time: %.2f sec" %(toc - tic)
 print "loading LSTM model pre-trained on source dataset..."
 #training parameters
 num_epochs = 16 
-batch_size = 32 #4
+batch_size = 32 
 
 #RNN architecture
 class RNN(nn.Module):
@@ -295,7 +296,7 @@ class DNN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(DNN, self).__init__()
         self.input_dim = input_dim
-        self.output_dim = output_dim  #2
+        self.output_dim = output_dim  
  
         self.fc1 = nn.Linear(self.input_dim, 128)
         self.fc2 = nn.Linear(128, 32)
@@ -318,21 +319,23 @@ if use_gpu:
     domain_clf = domain_clf.cuda()
 
 #define loss and optimizer
-criterion_gen = nn.MultiMarginLoss(p=1, margin=1, size_average=True)
+criterion_gen = nn.MultiMarginLoss(p=1, margin=0.3, size_average=True)
 criterion_dis = nn.CrossEntropyLoss(weight=None, size_average=True)
 optimizer_gen = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr=learning_rate, weight_decay=weight_decay)
+optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
 scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
-training_loss, validation_loss, test_loss = [], [], []
+training_loss_tot, training_loss_gen, training_loss_dis  = [], [], []
 
 #TODO: merge and shuffle train data!
 
 print "training..."
 for epoch in range(num_epochs):
     
-    running_train_loss = 0.0
+    running_train_loss_tot = 0.0
+    running_train_loss_gen = 0.0
+    running_train_loss_dis = 0.0
     
     train_data_loader = torch.utils.data.DataLoader(
         train_data, 
@@ -342,11 +345,12 @@ for epoch in range(num_epochs):
         drop_last = True)
         
     model.train()
+    domain_clf.train()
         
     for batch in tqdm(train_data_loader):
       
-        query_title = Variable(batch['query_title'])
-        query_body = Variable(batch['query_body'])
+        query_title = Variable(batch['q1_title'])
+        query_body = Variable(batch['q1_body'])
         similar_title = Variable(batch['similar_title'])
         similar_body = Variable(batch['similar_body'])
 
@@ -366,6 +370,8 @@ for epoch in range(num_epochs):
         
         optimizer_gen.zero_grad() 
         optimizer_dis.zero_grad() 
+
+        #question encoder
 
         #query title
         model.hidden = model.init_hidden() 
@@ -427,14 +433,27 @@ for epoch in range(num_epochs):
         if use_gpu:
             y_targets = y_targets.cuda()
         loss_gen = criterion_gen(X_scores, y_targets) #y_target=0
-        loss_gen.backward()
-        scheduler_gen.step()
+
+        #domain classifier
+        pred_domain_label = domain_clf(input_tensor)
+        loss_dis = criterion_dis(pred_domain_label, true_domain_label)
+
+        #compute total loss
+        loss_tot = loss_gen - Lambda * loss_dis  #TODO: make Lambda a function of epoch 
+
+        loss_tot.backward()   #call backward() once
+        scheduler_gen.step()  #min loss_tot: min loss_gen, max loss_dis
+        scheduler_dis.step()  #min loss_dis: update domain clf params with negative learning rate
                 
-        running_train_loss += loss.cpu().data[0]        
+        running_train_loss_tot += loss_tot.cpu().data[0]        
+        running_train_loss_gen += loss_gen.cpu().data[0]        
+        running_train_loss_dis += loss_dis.cpu().data[0]        
         
     #end for
-    training_loss.append(running_train_loss)
-    print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
+    training_loss_tot.append(running_train_loss_tot)
+    training_loss_gen.append(running_train_loss_gen)
+    training_loss_dis.append(running_train_loss_dis)
+    print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss_tot)
     
     torch.save(model, SAVE_PATH + '/adversarial_domain_transfer.pt')
 #end for
