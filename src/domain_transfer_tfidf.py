@@ -98,6 +98,12 @@ print "area under ROC curve: ", roc_auc
 
 fpr, tpr, thresholds = roc_curve(y_true, y_pred)
 
+y_df = pd.DataFrame()
+y_df['y_pred'] = y_pred
+y_df['y_true'] = y_true
+bins = np.linspace(min(y_pred)-0.1, max(y_pred)+0.1, 100)
+
+#generate plots
 plt.figure()
 plt.plot(fpr, tpr, c='b', lw=2.0, label='ROC curve (area = %0.2f)' % roc_auc)
 plt.plot([0, 1], [0, 1], c='k', lw=2.0, linestyle='--')
@@ -107,6 +113,13 @@ plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
 plt.savefig('../figures/domain_transfer_tfidf.png')
 
-
+plt.figure()
+sns.distplot(y_df[y_df['y_true']==1]['y_pred'], bins, kde=True, norm_hist=True, color='b', label='pos class')
+sns.distplot(y_df[y_df['y_true']==0]['y_pred'], bins, kde=True, norm_hist=True, color='r', label='neg class')
+plt.xlim([0,1])
+plt.legend(loc='upper right')
+plt.ylabel('normalized histogram')
+plt.title('pos and neg class separation')
+plt.savefig('../figures/domain_transfer_tfidf_hist.png')
 
 
