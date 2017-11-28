@@ -17,6 +17,7 @@ import torch.utils.data as data
 import torch.autograd as autograd
 from torch.autograd import Variable
 
+from random import shuffle
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics.pairwise import cosine_similarity
@@ -38,6 +39,7 @@ CNN_SAVE_NAME = config.get('cnn_params', 'save_name')
 EMBEDDINGS_FILE = config.get('paths', 'embeddings_path')
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
+TRAIN_SAMPLE_SIZE = int(config.get('data_params', 'TRAIN_SAMPLE_SIZE'))
 NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE'))
 #TODO: do we keep the same title and body len for android dataset?
 
@@ -69,77 +71,75 @@ def get_tensor_idx(text, word_to_idx, max_len):
     x = torch.LongTensor(text_idx)  #64-bit integer
     return x
 
-def generate_data_source(data_frame, train_text_df, word_to_idx, tokenizer, num_negative, type='pos'):
+def generate_train_data(data_frame, train_text_df, word_to_idx, tokenizer, num_samples, num_negative, type='source'):
 
-    source_dataset = []
-    #for idx in tqdm(range(data_frame.shape[0])):
-    for idx in tqdm(range(100)):
+    if num_samples == -1:
+        num_samples = data_frame.shape[0]
+
+    if (type == 'source'):
+        domain_label = 0
+    elif (type == 'target'):
+        domain_label = 1
+    else:
+        print "incorrect domain type: enter either source or target!"
+        return [] 
+
+    train_dataset = []
+    for idx in tqdm(range(num_samples)):
         query_id = data_frame.loc[idx, 'query_id']
         similar_id_list = map(int, data_frame.loc[idx, 'similar_id'].split(' '))
         random_id_list = map(int, data_frame.loc[idx, 'random_id'].split(' '))
     
         #query title and body tensor ids
-        q1_title = train_text_df[train_text_df['id'] == query_id].title.tolist() 
-        q1_body = train_text_df[train_text_df['id'] == query_id].body.tolist()
-        q1_title_tokens = tokenizer.tokenize(q1_title[0])[:MAX_TITLE_LEN]
-        q1_body_tokens = tokenizer.tokenize(q1_body[0])[:MAX_BODY_LEN]
-        q1_title_tensor_idx = get_tensor_idx(q1_title_tokens, word_to_idx, MAX_TITLE_LEN) 
-        q1_body_tensor_idx = get_tensor_idx(q1_body_tokens, word_to_idx, MAX_BODY_LEN)
+        query_title = train_text_df[train_text_df['id'] == query_id].title.tolist() 
+        query_body = train_text_df[train_text_df['id'] == query_id].body.tolist()
+        query_title_tokens = tokenizer.tokenize(query_title[0])[:MAX_TITLE_LEN]
+        query_body_tokens = tokenizer.tokenize(query_body[0])[:MAX_BODY_LEN]
+        query_title_tensor_idx = get_tensor_idx(query_title_tokens, word_to_idx, MAX_TITLE_LEN) 
+        query_body_tensor_idx = get_tensor_idx(query_body_tokens, word_to_idx, MAX_BODY_LEN)
 
-        if (type == 'pos'):
-            for similar_id in similar_id_list:
-                sample = {}  #reset sample dictionary here
-                sample['q1_idx'] = query_id
-                sample['q1_title'] = q1_title_tensor_idx
-                sample['q1_body'] = q1_body_tensor_idx
+        for similar_id in similar_id_list:
+            sample = {}  #reset sample dictionary here
+            sample['query_idx'] = query_id
+            sample['domain_label'] = domain_label
+            sample['query_title'] = query_title_tensor_idx
+            sample['query_body'] = query_body_tensor_idx
 
-                q2_title = train_text_df[train_text_df['id'] == similar_id].title.tolist() 
-                q2_body = train_text_df[train_text_df['id'] == similar_id].body.tolist()
-                q2_title_tokens = tokenizer.tokenize(q2_title[0])[:MAX_TITLE_LEN]
-                q2_body_tokens = tokenizer.tokenize(q2_body[0])[:MAX_BODY_LEN]
-                q2_title_tensor_idx = get_tensor_idx(q2_title_tokens, word_to_idx, MAX_TITLE_LEN) 
-                q2_body_tensor_idx = get_tensor_idx(q2_body_tokens, word_to_idx, MAX_BODY_LEN)
-                
-                sample['q2_idx'] = similar_id
-                sample['q2_title'] = q2_title_tensor_idx
-                sample['q2_body'] = q2_body_tensor_idx
-                sample['domain_label'] = 0  #source domain
-                
-                source_dataset.append(sample)
+            similar_title = train_text_df[train_text_df['id'] == similar_id].title.tolist() 
+            similar_body = train_text_df[train_text_df['id'] == similar_id].body.tolist()
+            similar_title_tokens = tokenizer.tokenize(similar_title[0])[:MAX_TITLE_LEN]
+            similar_body_tokens = tokenizer.tokenize(similar_body[0])[:MAX_BODY_LEN]
+            similar_title_tensor_idx = get_tensor_idx(similar_title_tokens, word_to_idx, MAX_TITLE_LEN) 
+            similar_body_tensor_idx = get_tensor_idx(similar_body_tokens, word_to_idx, MAX_BODY_LEN)
+            sample['similar_title'] = similar_title_tensor_idx
+            sample['similar_body'] = similar_body_tensor_idx
+
+            for ridx, random_id in enumerate(random_id_list[:num_negative]):
+                random_title_name = 'random_title_' + str(ridx)
+                random_body_name = 'random_body_' + str(ridx)
+        
+                random_title = train_text_df[train_text_df['id'] == random_id].title.tolist() 
+                random_body = train_text_df[train_text_df['id'] == random_id].body.tolist()
+
+                if (len(random_title) > 0 and len(random_body) > 0):
+                    random_title_tokens = tokenizer.tokenize(random_title[0])[:MAX_TITLE_LEN]
+                    random_body_tokens = tokenizer.tokenize(random_body[0])[:MAX_BODY_LEN]
+                    random_title_tensor_idx = get_tensor_idx(random_title_tokens, word_to_idx, MAX_TITLE_LEN) 
+                    random_body_tensor_idx = get_tensor_idx(random_body_tokens, word_to_idx, MAX_BODY_LEN)
+                    sample[random_title_name] = random_title_tensor_idx
+                    sample[random_body_name] = random_body_tensor_idx
+                else:
+                    #generate a vector of all zeros (need 100 negative examples for each batch)
+                    sample[random_title_name] = torch.zeros(MAX_TITLE_LEN).type(torch.LongTensor) 
+                    sample[random_body_name] = torch.zeros(MAX_BODY_LEN).type(torch.LongTensor)
+                #end if
             #end for
-        elif (type == 'neg'):
-            for random_id in random_id_list[:num_negative]:
-                sample = {} #reset sample dictionary here
-                sample['q1_idx'] = query_id
-                sample['q1_title'] = q1_title_tensor_idx
-                sample['q1_body'] = q1_body_tensor_idx
-
-                q2_title = train_text_df[train_text_df['id'] == random_id].title.tolist() 
-                q2_body = train_text_df[train_text_df['id'] == random_id].body.tolist()
-                
-                if (len(q2_title) > 0 and len(q2_body) > 0):
-                    q2_title_tokens = tokenizer.tokenize(q2_title[0])[:MAX_TITLE_LEN]
-                    q2_body_tokens = tokenizer.tokenize(q2_body[0])[:MAX_BODY_LEN]
-                    q2_title_tensor_idx = get_tensor_idx(q2_title_tokens, word_to_idx, MAX_TITLE_LEN) 
-                    q2_body_tensor_idx = get_tensor_idx(q2_body_tokens, word_to_idx, MAX_BODY_LEN)
-                    
-                    sample['q2_idx'] = random_id
-                    sample['q2_title'] = q2_title_tensor_idx
-                    sample['q2_body'] = q2_body_tensor_idx
-                    sample['domain_label'] = 0  #source domain
-                
-                    source_dataset.append(sample)
-                #end if 
-            #end for
-        else:
-            print "Incorrect type: specify either pos or neg type!"
-            break
-        #end if
+            train_dataset.append(sample)
+        #end for
     #end for
-    return source_dataset 
+    return train_dataset 
 
-
-def generate_data_target(data_frame, train_text_df, word_to_idx, tokenizer):
+def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
 
     target_dataset = []
     #for idx in tqdm(range(data_frame.shape[0])):
@@ -216,10 +216,23 @@ target_pos_df.columns = ['id_1', 'id_2']
 target_neg_file = DATA_PATH_TARGET + '/test.neg.txt'
 target_neg_df = pd.read_table(target_neg_file, sep=' ', header=None)
 target_neg_df.columns = ['id_1', 'id_2']
+
+#generate target_idx_df with format similar to source
+target_idx_df = pd.DataFrame()
+for row_idx in range(target_pos_df.shape[0]):
+    query_id = target_pos_df.loc[row_idx, 'id_1']
+    similar_id = target_pos_df.loc[row_idx, 'id_2']
+    random_id_list = target_neg_df[target_neg_df['id_1']==query_id]['id_2'].astype('str').tolist()
+
+    target_idx_df.loc[row_idx, 'query_id'] = query_id 
+    target_idx_df.loc[row_idx, 'similar_id'] = similar_id 
+    target_idx_df.loc[row_idx, 'random_id'] = " ".join(random_id_list)
+#end for    
+target_idx_df[['query_id', 'similar_id']] = target_idx_df[['query_id', 'similar_id']].astype(int)
+target_idx_df['similar_id'] = target_idx_df['similar_id'].astype(str)
+
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
-
-import pdb; pdb.set_trace()
 
 print "loading embeddings..."
 tic = time()
@@ -228,24 +241,34 @@ print "vocab size (embeddings): ", len(word_to_idx)
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
-print "generating (train) pos and neg source datasets..."
+print "generating training data ..."
 tic = time()
-source_pos_data = generate_data_source(source_idx_df, source_text_df, word_to_idx, tokenizer, NUM_NEGATIVE, type='pos')
-source_neg_data = generate_data_source(source_idx_df, source_text_df, word_to_idx, tokenizer, NUM_NEGATIVE, type='neg')
+TRAIN_SAMPLE_SIZE = int(config.get('data_params', 'TRAIN_SAMPLE_SIZE'))
+source_train_data = generate_train_data(source_idx_df, source_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, NUM_NEGATIVE, type='source')
+target_train_data = generate_train_data(target_idx_df, target_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, NUM_NEGATIVE, type='target')
+train_data_combined = source_train_data + target_train_data  #merge source and target data
+shuffle(train_data_combined) #permute randomly in-place 
+
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
-print "generating (test) pos and neg target datasets..."
+print "generating test data..."
 tic = time()
-target_pos_data = generate_data_target(target_pos_df, target_text_df, word_to_idx, tokenizer)
-target_neg_data = generate_data_target(target_neg_df, target_text_df, word_to_idx, tokenizer)
+target_test_pos_data = generate_test_data(target_pos_df, target_text_df, word_to_idx, tokenizer)
+target_test_neg_data = generate_test_data(target_neg_df, target_text_df, word_to_idx, tokenizer)
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
-print "loading LSTM model pre-trained on source dataset..."
+print "instantiating question encoder LSTM model..."
 #training parameters
 num_epochs = 16 
 batch_size = 32 
+
+#RNN parameters
+embed_dim = embeddings.shape[1] #200
+hidden_size = 240 #number of LSTM cells 
+weight_decay = 1e-6 
+learning_rate = 1e-3 
 
 #RNN architecture
 class RNN(nn.Module):
@@ -271,26 +294,20 @@ class RNN(nn.Module):
         h_n, c_n = self.hidden[0], self.hidden[1]
         return h_n.squeeze(0)
 
-#RNN parameters
-batch_size = 32 
-embed_dim = embeddings.shape[1] #200
-hidden_size = 240 # number of LSTM cells 
-model = RNN(embed_dim, hidden_size, len(word_to_idx), batch_size)
-
-#RNN weights
-model = torch.load(SAVE_PATH + RNN_SAVE_NAME)
-
-batch_size = model.batch_size
-hidden_size = model.hidden_size
-print "pre-trained LSTM batch-size: ", batch_size
-print "pre-trained LSTM hidden-size: ", hidden_size
-
 use_gpu = torch.cuda.is_available()
+
+model = RNN(embed_dim, hidden_size, len(word_to_idx), batch_size)
 if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
+    
+print model
 
 print "instantiating domain classifier model..."
+#DNN parameters
+dnn_input_dim = hidden_size
+dnn_output_dim = NUM_CLASSES
+
 #domain classifier architecture
 class DNN(nn.Module):
     def __init__(self, input_dim, output_dim):
@@ -310,13 +327,12 @@ class DNN(nn.Module):
         x = self.fc4(x)
         return x 
 
-#DNN parameters
-dnn_input_dim = hidden_size
-dnn_output_dim = NUM_CLASSES
 domain_clf = DNN(dnn_input_dim, dnn_output_dim)
 if use_gpu:
     print "found CUDA GPU..."
     domain_clf = domain_clf.cuda()
+
+print domain_clf
 
 #define loss and optimizer
 criterion_gen = nn.MultiMarginLoss(p=1, margin=0.3, size_average=True)
@@ -328,17 +344,15 @@ scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rat
 
 training_loss_tot, training_loss_gen, training_loss_dis  = [], [], []
 
-#TODO: merge and shuffle train data!
-
 print "training..."
 for epoch in range(num_epochs):
     
     running_train_loss_tot = 0.0
     running_train_loss_gen = 0.0
     running_train_loss_dis = 0.0
-    
+
     train_data_loader = torch.utils.data.DataLoader(
-        train_data, 
+        train_data_combined, 
         batch_size = batch_size,
         shuffle = True,
         num_workers = 4, 
@@ -349,8 +363,9 @@ for epoch in range(num_epochs):
         
     for batch in tqdm(train_data_loader):
       
-        query_title = Variable(batch['q1_title'])
-        query_body = Variable(batch['q1_body'])
+        domain_label = Variable(batch['domain_label'])
+        query_title = Variable(batch['query_title'])
+        query_body = Variable(batch['query_body'])
         similar_title = Variable(batch['similar_title'])
         similar_body = Variable(batch['similar_body'])
 
@@ -434,8 +449,19 @@ for epoch in range(num_epochs):
             y_targets = y_targets.cuda()
         loss_gen = criterion_gen(X_scores, y_targets) #y_target=0
 
+
         #domain classifier
-        pred_domain_label = domain_clf(input_tensor)
+        y_clf_query = domain_clf(lstm_query)
+        y_clf_similar = domain_clf(lstm_similar)
+
+        y_clf_random_list = []
+        for ridx in range(len(lstm_random_list)):
+            lstm_random = lstm_random_list[ridx]
+            y_clf_random = domain_clf(lstm_random)
+            y_clf_random_list.append(y_clf_random)
+        #end for
+           
+        #TODO: compute discriminator loss
         loss_dis = criterion_dis(pred_domain_label, true_domain_label)
 
         #compute total loss
@@ -465,12 +491,11 @@ if use_gpu:
     model = model.cuda()
 """
 
-"""
 print "scoring similarity between target questions..."
 y_true, y_pred_lstm = [], []
 
 test_data_loader_pos = torch.utils.data.DataLoader(
-    target_pos_data, 
+    target_test_pos_data, 
     batch_size = batch_size,
     shuffle = False,
     num_workers = 4, 
@@ -528,7 +553,7 @@ for batch in tqdm(test_data_loader_pos):
 #end for        
 
 test_data_loader_neg = torch.utils.data.DataLoader(
-    target_neg_data, 
+    target_test_neg_data, 
     batch_size = batch_size,
     shuffle = False,
     num_workers = 4, 
@@ -597,6 +622,5 @@ plt.title('LSTM Domain Transfer Direct')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
-plt.savefig('../figures/domain_transfer_direct_lstm.png')
-"""
+plt.savefig('../figures/domain_transfer_adversarial_lstm.png')
 
