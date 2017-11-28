@@ -90,7 +90,7 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-criterion = nn.MultiMarginLoss(p=1, margin=1, size_average=True)
+criterion = nn.MultiMarginLoss(p=1, margin=0.3, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 

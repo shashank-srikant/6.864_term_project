@@ -64,7 +64,7 @@ plt.savefig('../figures/question_len_hist.png')
 
 #training parameters
 num_epochs = 16 
-batch_size = 32 #4
+batch_size = 32 
 
 #model parameters
 embed_dim = embeddings.shape[1] #200
@@ -81,6 +81,7 @@ class RNN(nn.Module):
         self.batch_size = batch_size
 
         #TODO: ignore loss computations on 0 embedding index inputs 
+        #TODO: average pooling
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim) #TODO: make non-trainable
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, batch_first=True)
@@ -109,7 +110,7 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-criterion = nn.MultiMarginLoss(p=1, margin=1, size_average=True)
+criterion = nn.MultiMarginLoss(p=1, margin=0.3, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
