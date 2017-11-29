@@ -45,7 +45,7 @@ NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE'))
 #TODO: do we keep the same title and body len for android dataset?
 
 def lambda_schedule(epoch):
-    gamma = 10
+    gamma = 0.1 
     lambda_epoch = (2.0 / (1 + np.exp(-gamma * epoch))) - 1.0
     return Variable(torch.FloatTensor([lambda_epoch]), requires_grad=False)
 
@@ -501,7 +501,7 @@ for epoch in range(num_epochs):
         running_train_loss_dis += loss_dis.cpu().data[0]        
         
     #end for
-    lambda_list.append(lambda_k)
+    lambda_list.append(lambda_k.cpu().data[0])
     training_loss_tot.append(running_train_loss_tot)
     training_loss_gen.append(running_train_loss_gen)
     training_loss_dis.append(running_train_loss_dis)
@@ -645,7 +645,7 @@ fpr, tpr, thresholds = roc_curve(y_true, y_pred_lstm)
 plt.figure()
 plt.plot(fpr, tpr, c='b', lw=2.0, label='ROC curve (area = %0.2f)' % roc_auc)
 plt.plot([0, 1], [0, 1], c='k', lw=2.0, linestyle='--')
-plt.title('LSTM Domain Transfer Direct')
+plt.title('LSTM Adversarial Domain Transfer')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
