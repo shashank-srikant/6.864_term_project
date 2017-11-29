@@ -83,7 +83,7 @@ class RNN(nn.Module):
         #TODO: ignore loss computations on 0 embedding index inputs 
         #TODO: average pooling
         #TODO: display gradient magnitude
-        self.embedding_layer = nn.Embedding(vocab_size, embed_dim) #TODO: make non-trainable
+        self.embedding_layer = nn.Embedding(vocab_size, embed_dim) 
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, batch_first=True)
         self.hidden = self.init_hidden()
@@ -111,7 +111,7 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-criterion = nn.MultiMarginLoss(p=1, margin=0.3, size_average=True)
+criterion = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
@@ -227,6 +227,18 @@ for epoch in range(num_epochs):
     print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
     
     torch.save(model, SAVE_PATH + SAVE_NAME)
+
+    #early stopping
+    patience = 4
+    min_delta = 0.1
+    if epoch > 0 and training_loss[epoch-1] - training_loss[epoch] > min_delta:
+        patience_cnt = 0
+    else:
+        patience_cnt += 1
+
+    if patience_cnt > patience:
+        print "early stopping..."
+        break
 #end for
 """
 print "loading pre-trained model..."
