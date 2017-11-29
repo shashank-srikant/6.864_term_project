@@ -9,6 +9,7 @@ from time import time
 import cPickle as pickle
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
+from torch.optim.lr_scheduler import StepLR
 
 import torch
 import torch.nn as nn
@@ -319,12 +320,14 @@ class DNN(nn.Module):
         self.fc2 = nn.Linear(128, 32)
         self.fc3 = nn.Linear(32, 8)
         self.fc4 = nn.Linear(8, self.output_dim)
+        self.softmax = nn.LogSoftmax()
 
     def forward(self, x):
-        x = self.fc1(x)
-        x = self.fc2(x)
-        x = self.fc3(x)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         x = self.fc4(x)
+        x = self.softmax(x)
         return x 
 
 domain_clf = DNN(dnn_input_dim, dnn_output_dim)
@@ -335,8 +338,9 @@ if use_gpu:
 print domain_clf
 
 #define loss and optimizer
+#TODO: consider weights due to class imbalance
 criterion_gen = nn.MultiMarginLoss(p=1, margin=0.3, size_average=True)
-criterion_dis = nn.CrossEntropyLoss(weight=None, size_average=True)
+criterion_dis = nn.NLLLoss(weight=None, size_average=True)
 optimizer_gen = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
 scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
@@ -363,11 +367,13 @@ for epoch in range(num_epochs):
         
     for batch in tqdm(train_data_loader):
       
-        domain_label = Variable(batch['domain_label'])
         query_title = Variable(batch['query_title'])
         query_body = Variable(batch['query_body'])
         similar_title = Variable(batch['similar_title'])
         similar_body = Variable(batch['similar_body'])
+        
+        domain_label_flat = batch['domain_label'].numpy().ravel()
+        domain_label = Variable(torch.from_numpy(domain_label_flat))
 
         random_title_list = []
         random_body_list = []
@@ -460,12 +466,21 @@ for epoch in range(num_epochs):
             y_clf_random = domain_clf(lstm_random)
             y_clf_random_list.append(y_clf_random)
         #end for
-           
-        #TODO: compute discriminator loss
-        loss_dis = criterion_dis(pred_domain_label, true_domain_label)
+
+        loss_dis_query = criterion_dis(y_clf_query, domain_label)
+        loss_dis_similar = criterion_dis(y_clf_similar, domain_label)
+
+        loss_dis_random_list = []
+        for ridx in range(len(y_clf_random_list)):
+            y_clf_random = y_clf_random_list[ridx]
+            loss_dis_random = criterion_dis(y_clf_random, domain_label)
+            loss_dis_random_list.append(loss_dis_random)
+        #end for
+        loss_dis = loss_dis_query + loss_dis_similar + sum(loss_dis_random_list)
 
         #compute total loss
-        loss_tot = loss_gen - Lambda * loss_dis  #TODO: make Lambda a function of epoch 
+        Lambda = 0.5 #TODO: make Lambda a function of epoch
+        loss_tot = loss_gen - Lambda * loss_dis  
 
         loss_tot.backward()   #call backward() once
         scheduler_gen.step()  #min loss_tot: min loss_gen, max loss_dis
