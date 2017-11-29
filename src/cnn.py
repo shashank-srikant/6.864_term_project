@@ -57,7 +57,7 @@ embed_dim = len(embeddings[0])
 kernel_num = 100  #TODO: tune
 kernel_sizes = range(2,6)
 learning_rate = 1e-3 
-weight_decay = 1e-6
+weight_decay = 1e-5
 
 class  CNN(nn.Module):
     def __init__(self, embed_num, embed_dim, kernel_num, kernel_sizes):
@@ -94,6 +94,7 @@ criterion = nn.MultiMarginLoss(p=1, margin=0.3, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
+learning_rate_schedule = [] 
 training_loss, validation_loss, test_loss = [], [], []
 
 print "training..."
@@ -109,9 +110,10 @@ for epoch in range(num_epochs):
         drop_last = True)
         
     model.train()
+    scheduler.step()
         
     for batch in tqdm(train_data_loader):
-     
+    
         query_title = Variable(batch['query_title'])
         query_body = Variable(batch['query_body'])
         similar_title = Variable(batch['similar_title'])
@@ -164,12 +166,13 @@ for epoch in range(num_epochs):
             y_targets = y_targets.cuda()
         loss = criterion(X_scores, y_targets) #y_target=0
         loss.backward()
-        scheduler.step()
+        optimizer.step()
                 
         running_train_loss += loss.cpu().data[0]        
         
     #end for
     training_loss.append(running_train_loss)
+    learning_rate_schedule.append(scheduler.get_lr())
     print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
     
     torch.save(model, SAVE_PATH + SAVE_NAME)
@@ -278,7 +281,6 @@ cnn_map_test = compute_map(test_idx_df, score_name='cnn_score')
 print "cnn map (test): ", np.mean(cnn_map_test)
 
 
-"""
 #generate plots
 plt.figure()
 plt.plot(training_loss, label='Adam')
@@ -288,6 +290,15 @@ plt.ylabel("Training Loss")
 plt.legend()
 plt.savefig('../figures/cnn_training_loss.png')
 
+plt.figure()
+plt.plot(learning_rate_schedule, label='learning rate')
+plt.title("CNN learning rate schedule")
+plt.xlabel("Epoch")
+plt.ylabel("Learning rate")
+plt.legend()
+plt.savefig('../figures/cnn_learning_rate_schedule.png')
+
+"""
 plt.figure()
 plt.plot(validation_loss, label='Adam')
 plt.title("CNN Model Validation Loss")

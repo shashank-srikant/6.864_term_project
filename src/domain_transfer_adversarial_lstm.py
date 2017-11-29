@@ -370,6 +370,9 @@ for epoch in range(num_epochs):
         
     model.train()
     domain_clf.train()
+
+    scheduler_gen.step() 
+    scheduler_dis.step()
         
     for batch in tqdm(train_data_loader):
       
@@ -493,8 +496,8 @@ for epoch in range(num_epochs):
         loss_tot = loss_gen - lambda_k * loss_dis  
 
         loss_tot.backward()   #call backward() once
-        scheduler_gen.step()  #min loss_tot: min loss_gen, max loss_dis
-        scheduler_dis.step()  #min loss_dis: update domain clf params with negative learning rate
+        optimizer_gen.step()  #min loss_tot: min loss_gen, max loss_dis
+        optimizer_dis.step()  #min loss_dis: update domain clf params with negative learning rate
                 
         running_train_loss_tot += loss_tot.cpu().data[0]        
         running_train_loss_gen += loss_gen.cpu().data[0]        

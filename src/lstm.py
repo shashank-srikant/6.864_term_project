@@ -69,8 +69,8 @@ batch_size = 32
 #model parameters
 embed_dim = embeddings.shape[1] #200
 hidden_size = 240 #number of LSTM cells 
-weight_decay = 1e-6 
-learning_rate = 1e-3 
+weight_decay = 1e-5 
+learning_rate = 1e-3
 
 #RNN architecture
 class RNN(nn.Module):
@@ -82,6 +82,7 @@ class RNN(nn.Module):
 
         #TODO: ignore loss computations on 0 embedding index inputs 
         #TODO: average pooling
+        #TODO: display gradient magnitude
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim) #TODO: make non-trainable
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, batch_first=True)
@@ -114,6 +115,7 @@ criterion = nn.MultiMarginLoss(p=1, margin=0.3, size_average=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
+learning_rate_schedule = [] 
 training_loss, validation_loss, test_loss = [], [], []
 
 print "training..."
@@ -129,6 +131,7 @@ for epoch in range(num_epochs):
         drop_last = True)
         
     model.train()
+    scheduler.step()
         
     for batch in tqdm(train_data_loader):
       
@@ -214,12 +217,13 @@ for epoch in range(num_epochs):
             y_targets = y_targets.cuda()
         loss = criterion(X_scores, y_targets) #y_target=0
         loss.backward()
-        scheduler.step()
+        optimizer.step()
                 
         running_train_loss += loss.cpu().data[0]        
         
     #end for
     training_loss.append(running_train_loss)
+    learning_rate_schedule.append(scheduler.get_lr())
     print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
     
     torch.save(model, SAVE_PATH + SAVE_NAME)
@@ -356,7 +360,6 @@ lstm_map_test = compute_map(test_idx_df, score_name='lstm_score')
 print "lstm map (test): ", np.mean(lstm_map_test)
 
 
-"""
 #generate plots
 plt.figure()
 plt.plot(training_loss, label='Adam')
@@ -366,6 +369,15 @@ plt.ylabel("Training Loss")
 plt.legend()
 plt.savefig('../figures/lstm_training_loss.png')
 
+plt.figure()
+plt.plot(learning_rate_schedule, label='learning rate')
+plt.title("LSTM learning rate schedule")
+plt.xlabel("Epoch")
+plt.ylabel("Learning rate")
+plt.legend()
+plt.savefig('../figures/lstm_learning_rate_schedule.png')
+
+"""
 plt.figure()
 plt.plot(validation_loss, label='Adam')
 plt.title("LSTM Model Validation Loss")
