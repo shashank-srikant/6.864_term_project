@@ -44,6 +44,11 @@ TRAIN_SAMPLE_SIZE = int(config.get('data_params', 'TRAIN_SAMPLE_SIZE'))
 NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE'))
 #TODO: do we keep the same title and body len for android dataset?
 
+def lambda_schedule(epoch):
+    gamma = 10
+    lambda_epoch = (2.0 / (1 + np.exp(-gamma * epoch))) - 1.0
+    return Variable(torch.FloatTensor([lambda_epoch]), requires_grad=False)
+
 def get_embeddings():
     lines = []
     with open(EMBEDDINGS_FILE, 'r') as f:
@@ -346,6 +351,7 @@ optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr= -1 * learning_rate
 scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
+lambda_list = []
 training_loss_tot, training_loss_gen, training_loss_dis  = [], [], []
 
 print "training..."
@@ -384,6 +390,7 @@ for epoch in range(num_epochs):
             random_body_list.append(Variable(batch[random_body_name]))
 
         if use_gpu:
+            domain_label = domain_label.cuda()
             query_title, query_body = query_title.cuda(), query_body.cuda()
             similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
             random_title_list = map(lambda item: item.cuda(), random_title_list)
@@ -479,8 +486,11 @@ for epoch in range(num_epochs):
         loss_dis = loss_dis_query + loss_dis_similar + sum(loss_dis_random_list)
 
         #compute total loss
-        Lambda = 0.5 #TODO: make Lambda a function of epoch
-        loss_tot = loss_gen - Lambda * loss_dis  
+        lambda_k = lambda_schedule(epoch)
+        if use_gpu:
+            lambda_k = lambda_k.cuda()
+
+        loss_tot = loss_gen - lambda_k * loss_dis  
 
         loss_tot.backward()   #call backward() once
         scheduler_gen.step()  #min loss_tot: min loss_gen, max loss_dis
@@ -491,6 +501,7 @@ for epoch in range(num_epochs):
         running_train_loss_dis += loss_dis.cpu().data[0]        
         
     #end for
+    lambda_list.append(lambda_k)
     training_loss_tot.append(running_train_loss_tot)
     training_loss_gen.append(running_train_loss_gen)
     training_loss_dis.append(running_train_loss_dis)
@@ -630,6 +641,7 @@ print "area under ROC curve: ", roc_auc
 
 fpr, tpr, thresholds = roc_curve(y_true, y_pred_lstm)
 
+#generate plots
 plt.figure()
 plt.plot(fpr, tpr, c='b', lw=2.0, label='ROC curve (area = %0.2f)' % roc_auc)
 plt.plot([0, 1], [0, 1], c='k', lw=2.0, linestyle='--')
@@ -639,3 +651,9 @@ plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
 plt.savefig('../figures/domain_transfer_adversarial_lstm.png')
 
+plt.figure()
+plt.plot(lambda_list)
+plt.title('lambda schedule')
+plt.xlabel('epoch')
+plt.ylabel('lambda')
+plt.savefig('../figures/domain_transfer_adversarial_lambda.png')
