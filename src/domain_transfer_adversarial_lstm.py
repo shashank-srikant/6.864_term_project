@@ -19,6 +19,7 @@ import torch.autograd as autograd
 from torch.autograd import Variable
 
 from random import shuffle
+from sklearn.metrics import auc
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics.pairwise import cosine_similarity
@@ -45,7 +46,7 @@ NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE'))
 #TODO: do we keep the same title and body len for android dataset?
 
 def lambda_schedule(epoch):
-    gamma = 0.1 
+    gamma = 0.01 
     lambda_epoch = (2.0 / (1 + np.exp(-gamma * epoch))) - 1.0
     return Variable(torch.FloatTensor([lambda_epoch]), requires_grad=False)
 
@@ -644,6 +645,10 @@ print "area under ROC curve: ", roc_auc
 
 fpr, tpr, thresholds = roc_curve(y_true, y_pred_lstm)
 
+idx_fpr_thresh = np.where(fpr < 0.05)[0]
+roc_auc_0p05fpr = auc(fpr[idx_fpr_thresh], tpr[idx_fpr_thresh])
+print "ROC AUC(0.05): ", roc_auc_0p05fpr
+
 #generate plots
 plt.figure()
 plt.plot(fpr, tpr, c='b', lw=2.0, label='ROC curve (area = %0.2f)' % roc_auc)
@@ -660,3 +665,16 @@ plt.title('lambda schedule')
 plt.xlabel('epoch')
 plt.ylabel('lambda')
 plt.savefig('../figures/domain_transfer_adversarial_lambda.png')
+
+plt.figure()
+plt.plot(training_loss_tot, label='total loss')
+plt.plot(training_loss_gen, label='generator loss')
+plt.plot(training_loss_dis, label='discriminator loss')
+plt.title("Adversarial Domain Transfer Training Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.legend()
+plt.savefig('../figures/domain_transfer_adversarial_loss.png')
+
+
+

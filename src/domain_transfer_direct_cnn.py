@@ -17,6 +17,7 @@ import torch.utils.data as data
 import torch.autograd as autograd
 from torch.autograd import Variable
 
+from sklearn.metrics import auc
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics.pairwise import cosine_similarity
@@ -269,6 +270,10 @@ roc_auc = roc_auc_score(y_true, y_pred_cnn)
 print "area under ROC curve: ", roc_auc
 
 fpr, tpr, thresholds = roc_curve(y_true, y_pred_cnn)
+
+idx_fpr_thresh = np.where(fpr < 0.05)[0]
+roc_auc_0p05fpr = auc(fpr[idx_fpr_thresh], tpr[idx_fpr_thresh])
+print "ROC AUC(0.05): ", roc_auc_0p05fpr
 
 y_df = pd.DataFrame()
 y_df['y_pred'] = y_pred_cnn
