@@ -48,7 +48,7 @@ toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
 #training parameters
-num_epochs = 16
+num_epochs = 8 #16
 batch_size = 32 
 
 #model parameters
@@ -181,7 +181,9 @@ for epoch in range(num_epochs):
     #early stopping
     patience = 4
     min_delta = 0.1
-    if epoch > 0 and training_loss[epoch-1] - training_loss[epoch] > min_delta:
+    if epoch == 0:
+        patience_cnt = 0
+    elif epoch > 0 and training_loss[epoch-1] - training_loss[epoch] > min_delta:
         patience_cnt = 0
     else:
         patience_cnt += 1
