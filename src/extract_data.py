@@ -15,6 +15,7 @@ config.readfp(open(r'config.ini'))
 ROOT_PATH = config.get('paths', 'root_path')
 DATA_PATH = config.get('paths', 'data_path')
 SAVE_PATH = config.get('paths', 'save_path')
+INPUT_FILE_NAME = config.get('paths','input_rawtext_filename')
 EMBEDDINGS_FILE = config.get('paths', 'embeddings_path')
 DATA_FILE_NAME = config.get('paths', 'extracted_data_file_name')
 
@@ -46,7 +47,7 @@ def get_embeddings():
 #load data
 print "loading data..."
 tic = time()
-train_text_file = DATA_PATH + '/text_tokenized.txt'
+train_text_file = DATA_PATH + INPUT_FILE_NAME
 train_text_df = pd.read_table(train_text_file, sep='\t', header=None)
 train_text_df.columns = ['id', 'title', 'body']
 train_text_df = train_text_df.dropna()
