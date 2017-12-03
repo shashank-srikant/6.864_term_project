@@ -145,32 +145,39 @@ print "elapsed time: %.2f sec" %(toc - tic)
 print "loading LSTM model pre-trained on source dataset..."
 #RNN architecture
 class RNN(nn.Module):
+    
     def __init__(self, embed_dim, hidden_size, vocab_size, batch_size):
         super(RNN, self).__init__()
         self.hidden_size = hidden_size
         self.batch_size = batch_size
 
+        #TODO: ignore loss computations on 0 embedding index inputs 
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim) 
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
-        self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, batch_first=True)
+        self.embedding_layer.weight.requires_grad = False
+        self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1,
+                            bidirectional=True, batch_first=True)
         self.hidden = self.init_hidden()
     
     def init_hidden(self):
         #[num_layers, batch_size, hidden_size] for (h_n, c_n)
-        return (Variable(torch.zeros(1, self.batch_size, self.hidden_size)),
-                Variable(torch.zeros(1, self.batch_size, self.hidden_size)))
+        return (Variable(torch.zeros(2, self.batch_size, self.hidden_size)),
+                Variable(torch.zeros(2, self.batch_size, self.hidden_size)))
 
     def forward(self, x_idx):
         all_x = self.embedding_layer(x_idx)
+        #[batch_size, seq_length (num_words), embed_dim]
         lstm_out, self.hidden = self.lstm(all_x.view(self.batch_size, x_idx.size(1), -1), self.hidden)
-        #h_n dim: [1, batch_size, hidden_size]
-        h_n, c_n = self.hidden[0], self.hidden[1]
-        return h_n.squeeze(0)
+        h_avg_pool = torch.mean(lstm_out, dim=1)          #average pooling
+        #h_n, c_n = self.hidden[0], self.hidden[1]        #last pooling
+        #h_last_pool = torch.cat([h_n[0], h_n[1]], dim=1) #[batch_size, 2 x hidden_size] 
+
+        return h_avg_pool 
 
 #RNN parameters
 batch_size = 32 
 embed_dim = embeddings.shape[1] #200
-hidden_size = 240 # number of LSTM cells 
+hidden_size = 128 #hidden vector dim 
 model = RNN(embed_dim, hidden_size, len(word_to_idx), batch_size)
 
 #RNN weights
