@@ -46,7 +46,7 @@ NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE'))
 #TODO: do we keep the same title and body len for android dataset?
 
 def lambda_schedule(epoch):
-    gamma = 0.01 
+    gamma = 0.001 
     lambda_epoch = (2.0 / (1 + np.exp(-gamma * epoch))) - 1.0
     return Variable(torch.FloatTensor([lambda_epoch]), requires_grad=False)
 
@@ -250,12 +250,14 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 print "generating training data ..."
 tic = time()
-TRAIN_SAMPLE_SIZE = int(config.get('data_params', 'TRAIN_SAMPLE_SIZE'))
 source_train_data = generate_train_data(source_idx_df, source_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, NUM_NEGATIVE, type='source')
 target_train_data = generate_train_data(target_idx_df, target_text_df, word_to_idx, tokenizer, TRAIN_SAMPLE_SIZE, NUM_NEGATIVE, type='target')
+
 train_data_combined = source_train_data + target_train_data  #merge source and target data
 shuffle(train_data_combined) #permute randomly in-place 
 
+num_source_domain = len(source_train_data)
+num_target_domain = len(target_train_data)
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
@@ -273,8 +275,8 @@ batch_size = 32
 
 #RNN parameters
 embed_dim = embeddings.shape[1] #200
-hidden_size = 240 #number of LSTM cells 
-weight_decay = 1e-6 
+hidden_size = 128 #number of LSTM cells 
+weight_decay = 1e-5 
 learning_rate = 1e-3 
 
 #RNN architecture
@@ -286,7 +288,9 @@ class RNN(nn.Module):
 
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim) 
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
-        self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, batch_first=True)
+        self.embedding_layer.requires_grad = False
+        self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, 
+                            bidirectional=False, batch_first=True)
         self.hidden = self.init_hidden()
     
     def init_hidden(self):
@@ -296,10 +300,12 @@ class RNN(nn.Module):
 
     def forward(self, x_idx):
         all_x = self.embedding_layer(x_idx)
+        #[batch_size, seq_length (num_words), embed_dim]
         lstm_out, self.hidden = self.lstm(all_x.view(self.batch_size, x_idx.size(1), -1), self.hidden)
-        #h_n dim: [1, batch_size, hidden_size]
-        h_n, c_n = self.hidden[0], self.hidden[1]
-        return h_n.squeeze(0)
+        h_avg_pool = torch.mean(lstm_out, dim=1)  #average pooling
+        h_n, c_n = self.hidden[0], self.hidden[1] #last pooling
+        h_last_pool = h_n.squeeze(0)              #h_n dim: [1, batch_size, hidden_size] 
+        return h_avg_pool 
 
 use_gpu = torch.cuda.is_available()
 
@@ -344,9 +350,15 @@ if use_gpu:
 print domain_clf
 
 #define loss and optimizer
-#TODO: consider weights due to class imbalance
-criterion_gen = nn.MultiMarginLoss(p=1, margin=0.3, size_average=True)
-criterion_dis = nn.NLLLoss(weight=None, size_average=True)
+class_weights = np.array([num_source_domain, num_target_domain], dtype=np.float32)
+class_weights = sum(class_weights) / class_weights
+class_weights_tensor = torch.from_numpy(class_weights)
+if use_gpu:
+    class_weights_tensor = class_weights_tensor.cuda()
+print "class weights: ", class_weights
+
+criterion_gen = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True) #margin=0.3
+criterion_dis = nn.NLLLoss(weight=class_weights_tensor, size_average=True)
 optimizer_gen = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
 scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
@@ -354,6 +366,9 @@ scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rat
 
 lambda_list = []
 training_loss_tot, training_loss_gen, training_loss_dis  = [], [], []
+
+grad_norm_df = pd.DataFrame()
+weight_norm_df = pd.DataFrame()
 
 print "training..."
 for epoch in range(num_epochs):
@@ -375,7 +390,7 @@ for epoch in range(num_epochs):
     scheduler_gen.step() 
     scheduler_dis.step()
         
-    for batch in tqdm(train_data_loader):
+    for bidx, batch in enumerate(tqdm(train_data_loader)):
       
         query_title = Variable(batch['query_title'])
         query_body = Variable(batch['query_body'])
@@ -494,7 +509,7 @@ for epoch in range(num_epochs):
         if use_gpu:
             lambda_k = lambda_k.cuda()
 
-        loss_tot = loss_gen - lambda_k * loss_dis  
+        loss_tot = loss_gen - 1e-4 * loss_dis  #NOTE: keep lambda_k=1e-4 fixed
 
         loss_tot.backward()   #call backward() once
         optimizer_gen.step()  #min loss_tot: min loss_gen, max loss_dis
@@ -503,6 +518,23 @@ for epoch in range(num_epochs):
         running_train_loss_tot += loss_tot.cpu().data[0]        
         running_train_loss_gen += loss_gen.cpu().data[0]        
         running_train_loss_dis += loss_dis.cpu().data[0]        
+        
+        #gradient and weight norms 
+        df_idx = bidx + epoch * batch_size
+        grad_norm_df.loc[df_idx, 'df_idx'] = df_idx
+        weight_norm_df.loc[df_idx, 'df_idx'] = df_idx
+        
+        grad_norm_df.loc[df_idx,'w1_grad_l2'] = torch.norm(domain_clf.fc1.weight.grad, 2).cpu().data[0] 
+        weight_norm_df.loc[df_idx,'w1_data_l2'] = torch.norm(domain_clf.fc1.weight, 2).cpu().data[0]
+
+        grad_norm_df.loc[df_idx,'w2_grad_l2'] = torch.norm(domain_clf.fc2.weight.grad, 2).cpu().data[0] 
+        weight_norm_df.loc[df_idx,'w2_data_l2'] = torch.norm(domain_clf.fc2.weight, 2).cpu().data[0] 
+
+        grad_norm_df.loc[df_idx,'w3_grad_l2'] = torch.norm(domain_clf.fc3.weight.grad, 2).cpu().data[0] 
+        weight_norm_df.loc[df_idx,'w3_data_l2'] = torch.norm(domain_clf.fc3.weight, 2).cpu().data[0] 
+        
+        grad_norm_df.loc[df_idx,'w4_grad_l2'] = torch.norm(domain_clf.fc4.weight.grad, 2).cpu().data[0] 
+        weight_norm_df.loc[df_idx,'w4_data_l2'] = torch.norm(domain_clf.fc4.weight, 2).cpu().data[0] 
         
     #end for
     lambda_list.append(lambda_k.cpu().data[0])
@@ -675,6 +707,28 @@ plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.legend()
 plt.savefig('../figures/domain_transfer_adversarial_loss.png')
+
+plt.figure()
+plt.plot(grad_norm_df['w1_grad_l2'], c='r', alpha=0.8, label='w1 grad l2')
+plt.plot(grad_norm_df['w2_grad_l2'], c='b', alpha=0.8, label='w2 grad l2')
+plt.plot(grad_norm_df['w3_grad_l2'], c='g', alpha=0.8, label='w3 grad l2')
+plt.plot(grad_norm_df['w4_grad_l2'], c='k', alpha=0.8, label='w4 grad l2')
+plt.title('domain classifier gradient norm')
+plt.xlabel('num batches')
+plt.ylabel('l2 norm')
+plt.legend()
+plt.savefig('../figures/domain_transfer_adversarial_gradient_norm.png')
+
+plt.figure()
+plt.plot(weight_norm_df['w1_data_l2'], c='r', alpha=0.8, label='w1 data l2')
+plt.plot(weight_norm_df['w2_data_l2'], c='b', alpha=0.8, label='w2 data l2')
+plt.plot(weight_norm_df['w3_data_l2'], c='g', alpha=0.8, label='w3 data l2')
+plt.plot(weight_norm_df['w4_data_l2'], c='k', alpha=0.8, label='w4 data l2')
+plt.title('domain classifier weight norm')
+plt.xlabel('num batches')
+plt.ylabel('l2 norm')
+plt.legend()
+plt.savefig('../figures/domain_transfer_adversarial_weight_norm.png')
 
 
 
