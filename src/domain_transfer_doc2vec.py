@@ -35,8 +35,7 @@ def step_decay(epoch):
     return lr_new
 
 def read_corpus(data_frame, tokens_only=False):
-    for row_idx in tqdm(range(1000)):
-    #for row_idx in tqdm(range(data_frame.shape[0])):
+    for row_idx in tqdm(range(data_frame.shape[0])):
         title = data_frame.loc[row_idx, 'title']
         body = data_frame.loc[row_idx, 'body']
         line = title + " " + body
@@ -46,7 +45,7 @@ def read_corpus(data_frame, tokens_only=False):
         else:
             yield gensim.models.doc2vec.TaggedDocument(
                   gensim.utils.simple_preprocess(line),[row_idx])
-     #end for
+    #end for
 
 #load data
 print "loading data..."
