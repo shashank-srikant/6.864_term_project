@@ -17,7 +17,7 @@ from time import time
 import cPickle as pickle
 
 from ranking_metrics import compute_mrr, precision_at_k, compute_map
-from model_network import model_neural_network
+from model_network import model_cnn
 
 import sys
 
@@ -106,8 +106,8 @@ print "test data size:" + str(len(test_data))
 
 print "training..."
 
-training_loss, train_idx_df, learning_rate_schedule = model_neural_network(True, num_epochs, train_data, train_idx_df, batch_size, 40,  model, criterion, optimizer, scheduler, 'CNN_train', use_gpu, (SAVE_PATH + SAVE_NAME))
-running_test_loss, test_idx_df, _ = model_neural_network(False, num_epochs, test_data, test_idx_df, batch_size, 25,  model, criterion, optimizer, scheduler, 'CNN_test', use_gpu, (SAVE_PATH + SAVE_NAME + "test"))
+training_loss, train_idx_df, learning_rate_schedule = model_cnn(True, num_epochs, train_data, train_idx_df, batch_size, 40,  model, criterion, optimizer, scheduler, 'CNN_train', use_gpu, (SAVE_PATH + SAVE_NAME))
+running_test_loss, test_idx_df, _ = model_cnn(False, num_epochs, test_data, test_idx_df, batch_size, 25,  model, criterion, optimizer, scheduler, 'CNN_test', use_gpu, (SAVE_PATH + SAVE_NAME + "test"))
 
     
 print "total test loss: ", running_test_loss
@@ -118,16 +118,16 @@ test_idx_df = test_idx_df.dropna() #NaNs are due to restriction: range(100)
 test_idx_df.to_csv(SAVE_PATH + '/test_idx_df_scored_cnn.csv', header=True)
 
 print "computing ranking metrics..."
-cnn_mrr_test = compute_mrr(test_idx_df, score_name='cnn_score')
+cnn_mrr_test = compute_mrr(test_idx_df, score_name='CNN_test')
 print "cnn MRR (test): ", np.mean(cnn_mrr_test)
 
-cnn_pr1_test = precision_at_k(test_idx_df, K=1, score_name='cnn_score')
+cnn_pr1_test = precision_at_k(test_idx_df, K=1, score_name='CNN_test')
 print "cnn P@1 (test): ", np.mean(cnn_pr1_test)
 
-cnn_pr5_test = precision_at_k(test_idx_df, K=5, score_name='cnn_score')
+cnn_pr5_test = precision_at_k(test_idx_df, K=5, score_name='CNN_test')
 print "cnn P@5 (test): ", np.mean(cnn_pr5_test)
 
-cnn_map_test = compute_map(test_idx_df, score_name='cnn_score')
+cnn_map_test = compute_map(test_idx_df, score_name='CNN_test')
 print "cnn map (test): ", np.mean(cnn_map_test)
 
 

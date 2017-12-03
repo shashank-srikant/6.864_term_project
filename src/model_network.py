@@ -7,7 +7,7 @@ from torch.autograd import Variable
 from torch.optim.lr_scheduler import StepLR
 from tqdm import tqdm
 
-def model_neural_network(is_training_phase, num_epochs, data_to_load, idx_df, batch_size, number_negative_examples, model, criterion, optimizer, scheduler, model_name, use_gpu, save_model_at):
+def model_cnn(is_training_phase, num_epochs, data_to_load, idx_df, batch_size, number_negative_examples, model, criterion, optimizer, scheduler, model_name, use_gpu, save_model_at):
     print "Model invoked"
     loss_per_epoch = []
     learning_rate_schedule = []
