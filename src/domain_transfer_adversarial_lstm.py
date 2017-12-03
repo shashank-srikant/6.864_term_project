@@ -275,7 +275,7 @@ batch_size = 32
 
 #RNN parameters
 embed_dim = embeddings.shape[1] #200
-hidden_size = 128 #number of LSTM cells 
+hidden_size = 128 #hidden vector dim 
 weight_decay = 1e-5 
 learning_rate = 1e-3 
 
@@ -288,23 +288,23 @@ class RNN(nn.Module):
 
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim) 
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
-        self.embedding_layer.requires_grad = False
+        self.embedding_layer.weight.requires_grad = True  #NOTE: make trainable
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, 
-                            bidirectional=False, batch_first=True)
+                            bidirectional=True, batch_first=True)
         self.hidden = self.init_hidden()
     
     def init_hidden(self):
         #[num_layers, batch_size, hidden_size] for (h_n, c_n)
-        return (Variable(torch.zeros(1, self.batch_size, self.hidden_size)),
-                Variable(torch.zeros(1, self.batch_size, self.hidden_size)))
+        return (Variable(torch.zeros(2, self.batch_size, self.hidden_size)),
+                Variable(torch.zeros(2, self.batch_size, self.hidden_size)))
 
     def forward(self, x_idx):
         all_x = self.embedding_layer(x_idx)
         #[batch_size, seq_length (num_words), embed_dim]
         lstm_out, self.hidden = self.lstm(all_x.view(self.batch_size, x_idx.size(1), -1), self.hidden)
-        h_avg_pool = torch.mean(lstm_out, dim=1)  #average pooling
-        h_n, c_n = self.hidden[0], self.hidden[1] #last pooling
-        h_last_pool = h_n.squeeze(0)              #h_n dim: [1, batch_size, hidden_size] 
+        h_avg_pool = torch.mean(lstm_out, dim=1)          #average pooling
+        #h_n, c_n = self.hidden[0], self.hidden[1]        #last pooling
+        #h_last_pool = torch.cat([h_n[0], h_n[1]], dim=1) #[batch_size, 2 x hidden_size] 
         return h_avg_pool 
 
 use_gpu = torch.cuda.is_available()
@@ -357,9 +357,11 @@ if use_gpu:
     class_weights_tensor = class_weights_tensor.cuda()
 print "class weights: ", class_weights
 
+model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+
 criterion_gen = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True) #margin=0.3
 criterion_dis = nn.NLLLoss(weight=class_weights_tensor, size_average=True)
-optimizer_gen = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+optimizer_gen = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
 optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
 scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rate every 4 epochs
