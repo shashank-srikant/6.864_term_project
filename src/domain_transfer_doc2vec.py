@@ -87,7 +87,7 @@ source_corpus = list(read_corpus(source_text_df))
 
 print "initializing doc2vec..."
 #training parameters
-num_epochs = 16 
+num_epochs = 64 
 lr_init= 0.025
 lr_min = 0.001
 lr_delta = (lr_init - lr_min) / float(num_epochs)
