@@ -288,6 +288,7 @@ class RNN(nn.Module):
 
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim) 
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
+        self.embedding_layer.requires_grad = False
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, 
                             bidirectional=False, batch_first=True)
         self.hidden = self.init_hidden()
@@ -366,6 +367,9 @@ scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rat
 lambda_list = []
 training_loss_tot, training_loss_gen, training_loss_dis  = [], [], []
 
+grad_norm_df = pd.DataFrame()
+weight_norm_df = pd.DataFrame()
+
 print "training..."
 for epoch in range(num_epochs):
     
@@ -386,7 +390,7 @@ for epoch in range(num_epochs):
     scheduler_gen.step() 
     scheduler_dis.step()
         
-    for batch in tqdm(train_data_loader):
+    for bidx, batch in enumerate(tqdm(train_data_loader)):
       
         query_title = Variable(batch['query_title'])
         query_body = Variable(batch['query_body'])
@@ -514,6 +518,23 @@ for epoch in range(num_epochs):
         running_train_loss_tot += loss_tot.cpu().data[0]        
         running_train_loss_gen += loss_gen.cpu().data[0]        
         running_train_loss_dis += loss_dis.cpu().data[0]        
+        
+        #gradient and weight norms 
+        df_idx = bidx + epoch * batch_size
+        grad_norm_df.loc[df_idx, 'df_idx'] = df_idx
+        weight_norm_df.loc[df_idx, 'df_idx'] = df_idx
+        
+        grad_norm_df.loc[df_idx,'w1_grad_l2'] = torch.norm(domain_clf.fc1.weight.grad, 2).cpu().data[0] 
+        weight_norm_df.loc[df_idx,'w1_data_l2'] = torch.norm(domain_clf.fc1.weight, 2).cpu().data[0]
+
+        grad_norm_df.loc[df_idx,'w2_grad_l2'] = torch.norm(domain_clf.fc2.weight.grad, 2).cpu().data[0] 
+        weight_norm_df.loc[df_idx,'w2_data_l2'] = torch.norm(domain_clf.fc2.weight, 2).cpu().data[0] 
+
+        grad_norm_df.loc[df_idx,'w3_grad_l2'] = torch.norm(domain_clf.fc3.weight.grad, 2).cpu().data[0] 
+        weight_norm_df.loc[df_idx,'w3_data_l2'] = torch.norm(domain_clf.fc3.weight, 2).cpu().data[0] 
+        
+        grad_norm_df.loc[df_idx,'w4_grad_l2'] = torch.norm(domain_clf.fc4.weight.grad, 2).cpu().data[0] 
+        weight_norm_df.loc[df_idx,'w4_data_l2'] = torch.norm(domain_clf.fc4.weight, 2).cpu().data[0] 
         
     #end for
     lambda_list.append(lambda_k.cpu().data[0])
@@ -686,6 +707,28 @@ plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.legend()
 plt.savefig('../figures/domain_transfer_adversarial_loss.png')
+
+plt.figure()
+plt.plot(grad_norm_df['w1_grad_l2'], c='r', alpha=0.8, label='w1 grad l2')
+plt.plot(grad_norm_df['w2_grad_l2'], c='b', alpha=0.8, label='w2 grad l2')
+plt.plot(grad_norm_df['w3_grad_l2'], c='g', alpha=0.8, label='w3 grad l2')
+plt.plot(grad_norm_df['w4_grad_l2'], c='k', alpha=0.8, label='w4 grad l2')
+plt.title('domain classifier gradient norm')
+plt.xlabel('num batches')
+plt.ylabel('l2 norm')
+plt.legend()
+plt.savefig('../figures/domain_transfer_adversarial_gradient_norm.png')
+
+plt.figure()
+plt.plot(weight_norm_df['w1_data_l2'], c='r', alpha=0.8, label='w1 data l2')
+plt.plot(weight_norm_df['w2_data_l2'], c='b', alpha=0.8, label='w2 data l2')
+plt.plot(weight_norm_df['w3_data_l2'], c='g', alpha=0.8, label='w3 data l2')
+plt.plot(weight_norm_df['w4_data_l2'], c='k', alpha=0.8, label='w4 data l2')
+plt.title('domain classifier weight norm')
+plt.xlabel('num batches')
+plt.ylabel('l2 norm')
+plt.legend()
+plt.savefig('../figures/domain_transfer_adversarial_weight_norm.png')
 
 
 
