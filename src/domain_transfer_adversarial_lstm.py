@@ -18,6 +18,7 @@ import torch.utils.data as data
 import torch.autograd as autograd
 from torch.autograd import Variable
 
+from meter import AUCMeter 
 from random import shuffle
 from sklearn.metrics import auc
 from sklearn.metrics import roc_curve
@@ -557,6 +558,7 @@ if use_gpu:
 
 print "scoring similarity between target questions..."
 y_true, y_pred_lstm = [], []
+auc_meter = AUCMeter()
 
 test_data_loader_pos = torch.utils.data.DataLoader(
     target_test_pos_data, 
@@ -614,6 +616,7 @@ for batch in tqdm(test_data_loader_pos):
 
     y_true.extend(np.ones(batch_size)) #true label (similar)
     y_pred_lstm.extend(score_pos_numpy.tolist())
+    auc_meter.add(score_pos_numpy, np.ones(batch_size))
 #end for        
 
 test_data_loader_neg = torch.utils.data.DataLoader(
@@ -672,6 +675,7 @@ for batch in tqdm(test_data_loader_neg):
 
     y_true.extend(np.zeros(batch_size)) #true label (not similar)
     y_pred_lstm.extend(score_neg_numpy.tolist())
+    auc_meter.add(score_neg_numpy, np.zeros(batch_size))
 #end for        
 
 roc_auc = roc_auc_score(y_true, y_pred_lstm)
@@ -681,7 +685,10 @@ fpr, tpr, thresholds = roc_curve(y_true, y_pred_lstm)
 
 idx_fpr_thresh = np.where(fpr < 0.05)[0]
 roc_auc_0p05fpr = auc(fpr[idx_fpr_thresh], tpr[idx_fpr_thresh])
-print "ROC AUC(0.05): ", roc_auc_0p05fpr
+print "ROC AUC(0.05) sklearn: ", roc_auc_0p05fpr
+
+roc_auc_0p05fpr_meter = auc_meter.value(0.05)
+print "ROC AUC(0.05) meter: ", roc_auc_0p05fpr_meter
 
 #generate plots
 plt.figure()
