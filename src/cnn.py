@@ -15,11 +15,9 @@ import ConfigParser
 from tqdm import tqdm
 from time import time
 import cPickle as pickle
-
+from nltk.corpus import stopwords
+from nltk.tokenize import RegexpTokenizer
 from ranking_metrics import compute_mrr, precision_at_k, compute_map
-from model_network import model_cnn
-
-import sys
 
 np.random.seed(0)
 #torch.manual_seed(0)
@@ -50,13 +48,13 @@ toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
 #training parameters
-num_epochs = 2 #16
-batch_size = 32 
+num_epochs = 16
+batch_size = 32
 
 #model parameters
 embed_num = len(word_to_idx)
 embed_dim = len(embeddings[0])
-kernel_num = 100  #TODO: tune
+kernel_num = 200  #TODO: tune
 kernel_sizes = range(2,6)
 learning_rate = 1e-3 
 weight_decay = 1e-5
@@ -71,7 +69,7 @@ class  CNN(nn.Module):
         Ks = kernel_sizes #height of each filter
 
         self.embed = nn.Embedding(V, D)
-        self.embed.requires_grad = False
+        self.embed.weight.requires_grad = False
         self.embed.weight.data = torch.from_numpy(embeddings)
         self.convs1 = nn.ModuleList([nn.Conv2d(Ci, Co, (K, D)) for K in Ks])
 
@@ -94,21 +92,188 @@ print model
 
 #define loss and optimizer
 criterion = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True)
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+optimizer = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
 learning_rate_schedule = [] 
 training_loss, validation_loss, test_loss = [], [], []
 
-print "train data size:" + str(len(train_data))
-print "val data size:" + str(len(val_data))
-print "test data size:" + str(len(test_data))
-
 print "training..."
+for epoch in range(num_epochs):
+    
+    running_train_loss = 0.0
+    
+    train_data_loader = torch.utils.data.DataLoader(
+        train_data, 
+        batch_size = batch_size,
+        shuffle = True,
+        num_workers = 4, 
+        drop_last = True)
+        
+    model.train()
+    scheduler.step()
+        
+    for batch in tqdm(train_data_loader):
+    
+        query_title = Variable(batch['query_title'])
+        query_body = Variable(batch['query_body'])
+        similar_title = Variable(batch['similar_title'])
+        similar_body = Variable(batch['similar_body'])
 
-training_loss, train_idx_df, learning_rate_schedule = model_cnn(True, num_epochs, train_data, train_idx_df, batch_size, 40,  model, criterion, optimizer, scheduler, 'CNN_train', use_gpu, (SAVE_PATH + SAVE_NAME))
-running_test_loss, test_idx_df, _ = model_cnn(False, num_epochs, test_data, test_idx_df, batch_size, 25,  model, criterion, optimizer, scheduler, 'CNN_test', use_gpu, (SAVE_PATH + SAVE_NAME + "test"))
+        random_title_list = []
+        random_body_list = []
+        for ridx in range(NUM_NEGATIVE): #number of random negative examples
+            random_title_name = 'random_title_' + str(ridx)
+            random_body_name = 'random_body_' + str(ridx)
+            random_title_list.append(Variable(batch[random_title_name]))
+            random_body_list.append(Variable(batch[random_body_name]))
 
+        if use_gpu:
+            query_title, query_body = query_title.cuda(), query_body.cuda()
+            similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
+            random_title_list = map(lambda item: item.cuda(), random_title_list)
+            random_body_list = map(lambda item: item.cuda(), random_body_list)
+        
+        optimizer.zero_grad()
+
+        cnn_query_title = model(query_title)
+        cnn_query_body = model(query_body)
+        cnn_query = (cnn_query_title + cnn_query_body)/2.0
+
+        cnn_similar_title = model(similar_title)
+        cnn_similar_body = model(similar_body)
+        cnn_similar = (cnn_similar_title + cnn_similar_body)/2.0
+
+        cnn_random_list = []
+        for ridx in range(len(random_title_list)):
+            cnn_random_title = model(random_title_list[ridx])
+            cnn_random_body = model(random_body_list[ridx])
+            cnn_random = (cnn_random_title + cnn_random_body)/2.0
+            cnn_random_list.append(cnn_random)
+        #end for
+           
+        cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+        score_pos = cosine_similarity(cnn_query, cnn_similar)
+
+        score_list = []
+        score_list.append(score_pos)
+        for ridx in range(len(cnn_random_list)):
+            score_neg = cosine_similarity(cnn_query, cnn_random_list[ridx])
+            score_list.append(score_neg)
+
+        X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
+        y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
+        if use_gpu:
+            y_targets = y_targets.cuda()
+        loss = criterion(X_scores, y_targets) #y_target=0
+        loss.backward()
+        optimizer.step()
+                
+        running_train_loss += loss.cpu().data[0]        
+        
+    #end for
+
+    training_loss.append(running_train_loss)
+    learning_rate_schedule.append(scheduler.get_lr())
+    print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
+    
+    torch.save(model, SAVE_PATH + SAVE_NAME)
+
+    #early stopping
+    patience = 4
+    min_delta = 0.1
+    if epoch == 0:
+        patience_cnt = 0
+    elif epoch > 0 and training_loss[epoch-1] - training_loss[epoch] > min_delta:
+        patience_cnt = 0
+    else:
+        patience_cnt += 1
+
+    if patience_cnt > patience:
+        print "early stopping..."
+        break
+#end for
+"""
+print "loading pre-trained model..."
+model = torch.load(SAVE_PATH)
+if use_gpu:
+    print "found CUDA GPU..."
+    model = model.cuda()
+"""
+
+print "scoring test questions..."
+running_test_loss = 0.0
+
+test_data_loader = torch.utils.data.DataLoader(
+    test_data, 
+    batch_size = batch_size,
+    shuffle = False,
+    num_workers = 4, 
+    drop_last = True)
+        
+model.eval()
+
+for batch in tqdm(test_data_loader):
+
+    query_idx = batch['query_idx']
+    query_title = Variable(batch['query_title'])
+    query_body = Variable(batch['query_body'])
+    similar_title = Variable(batch['similar_title'])
+    similar_body = Variable(batch['similar_body'])
+
+    random_title_list = []
+    random_body_list = []
+    for ridx in range(20): #number of retrieved (bm25) examples
+        random_title_name = 'random_title_' + str(ridx)
+        random_body_name = 'random_body_' + str(ridx)
+        random_title_list.append(Variable(batch[random_title_name]))
+        random_body_list.append(Variable(batch[random_body_name]))
+
+    if use_gpu:
+        query_title, query_body = query_title.cuda(), query_body.cuda()
+        similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
+        random_title_list = map(lambda item: item.cuda(), random_title_list)
+        random_body_list = map(lambda item: item.cuda(), random_body_list)
+    
+    cnn_query_title = model(query_title)
+    cnn_query_body = model(query_body)
+    cnn_query = (cnn_query_title + cnn_query_body)/2.0
+
+    cnn_similar_title = model(similar_title)
+    cnn_similar_body = model(similar_body)
+    cnn_similar = (cnn_similar_title + cnn_similar_body)/2.0
+
+    cnn_random_list = []
+    for ridx in range(len(random_title_list)):
+        cnn_random_title = model(random_title_list[ridx])
+        cnn_random_body = model(random_body_list[ridx])
+        cnn_random = (cnn_random_title + cnn_random_body)/2.0
+        cnn_random_list.append(cnn_random)
+    #end for
+           
+    cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+    score_pos = cosine_similarity(cnn_query, cnn_similar)
+
+    score_list = []
+    score_list.append(score_pos)
+    for ridx in range(len(cnn_random_list)):
+        score_neg = cosine_similarity(cnn_query, cnn_random_list[ridx])
+        score_list.append(score_neg)
+
+    X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
+    y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
+    if use_gpu:
+        y_targets = y_targets.cuda()
+    loss = criterion(X_scores, y_targets) #y_target=0
+    running_test_loss += loss.cpu().data[0]        
+    
+    #save scores to data-frame
+    cnn_query_idx = query_idx.cpu().numpy()
+    cnn_retrieved_scores = X_scores.cpu().data.numpy()[:,1:] #skip positive score
+    for row, qidx in enumerate(cnn_query_idx):
+        test_idx_df.loc[test_idx_df['query_id'] == qidx, 'cnn_score'] = " ".join(cnn_retrieved_scores[row,:].astype('str'))
+#end for        
     
 print "total test loss: ", running_test_loss
 print "number of NaN: \n", test_idx_df.isnull().sum()
@@ -118,16 +283,16 @@ test_idx_df = test_idx_df.dropna() #NaNs are due to restriction: range(100)
 test_idx_df.to_csv(SAVE_PATH + '/test_idx_df_scored_cnn.csv', header=True)
 
 print "computing ranking metrics..."
-cnn_mrr_test = compute_mrr(test_idx_df, score_name='CNN_test')
+cnn_mrr_test = compute_mrr(test_idx_df, score_name='cnn_score')
 print "cnn MRR (test): ", np.mean(cnn_mrr_test)
 
-cnn_pr1_test = precision_at_k(test_idx_df, K=1, score_name='CNN_test')
+cnn_pr1_test = precision_at_k(test_idx_df, K=1, score_name='cnn_score')
 print "cnn P@1 (test): ", np.mean(cnn_pr1_test)
 
-cnn_pr5_test = precision_at_k(test_idx_df, K=5, score_name='CNN_test')
+cnn_pr5_test = precision_at_k(test_idx_df, K=5, score_name='cnn_score')
 print "cnn P@5 (test): ", np.mean(cnn_pr5_test)
 
-cnn_map_test = compute_map(test_idx_df, score_name='CNN_test')
+cnn_map_test = compute_map(test_idx_df, score_name='cnn_score')
 print "cnn map (test): ", np.mean(cnn_map_test)
 
 
@@ -138,7 +303,7 @@ plt.title("CNN Model Training Loss")
 plt.xlabel("Epoch")
 plt.ylabel("Training Loss")
 plt.legend()
-plt.savefig('../figures/cnn_training_loss1.png')
+plt.savefig('../figures/cnn_training_loss.png')
 
 plt.figure()
 plt.plot(learning_rate_schedule, label='learning rate')
@@ -146,7 +311,7 @@ plt.title("CNN learning rate schedule")
 plt.xlabel("Epoch")
 plt.ylabel("Learning rate")
 plt.legend()
-plt.savefig('../figures/cnn_learning_rate_schedule1.png')
+plt.savefig('../figures/cnn_learning_rate_schedule.png')
 
 """
 plt.figure()
@@ -158,4 +323,96 @@ plt.legend()
 plt.savefig('../figures/cnn_validation_loss.png')
 """
 
+
+print "scoring test questions..."
+running_val_loss = 0.0
+
+val_data_loader = torch.utils.data.DataLoader(
+    val_data, 
+    batch_size = batch_size,
+    shuffle = False,
+    num_workers = 4, 
+    drop_last = True)
         
+model.eval()
+
+for batch in tqdm(val_data_loader):
+
+    query_idx = batch['query_idx']
+    query_title = Variable(batch['query_title'])
+    query_body = Variable(batch['query_body'])
+    similar_title = Variable(batch['similar_title'])
+    similar_body = Variable(batch['similar_body'])
+
+    random_title_list = []
+    random_body_list = []
+    for ridx in range(20): #number of retrieved (bm25) examples
+        random_title_name = 'random_title_' + str(ridx)
+        random_body_name = 'random_body_' + str(ridx)
+        random_title_list.append(Variable(batch[random_title_name]))
+        random_body_list.append(Variable(batch[random_body_name]))
+
+    if use_gpu:
+        query_title, query_body = query_title.cuda(), query_body.cuda()
+        similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
+        random_title_list = map(lambda item: item.cuda(), random_title_list)
+        random_body_list = map(lambda item: item.cuda(), random_body_list)
+    
+    cnn_query_title = model(query_title)
+    cnn_query_body = model(query_body)
+    cnn_query = (cnn_query_title + cnn_query_body)/2.0
+
+    cnn_similar_title = model(similar_title)
+    cnn_similar_body = model(similar_body)
+    cnn_similar = (cnn_similar_title + cnn_similar_body)/2.0
+
+    cnn_random_list = []
+    for ridx in range(len(random_title_list)):
+        cnn_random_title = model(random_title_list[ridx])
+        cnn_random_body = model(random_body_list[ridx])
+        cnn_random = (cnn_random_title + cnn_random_body)/2.0
+        cnn_random_list.append(cnn_random)
+    #end for
+           
+    cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+    score_pos = cosine_similarity(cnn_query, cnn_similar)
+
+    score_list = []
+    score_list.append(score_pos)
+    for ridx in range(len(cnn_random_list)):
+        score_neg = cosine_similarity(cnn_query, cnn_random_list[ridx])
+        score_list.append(score_neg)
+
+    X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
+    y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
+    if use_gpu:
+        y_targets = y_targets.cuda()
+    loss = criterion(X_scores, y_targets) #y_target=0
+    running_val_loss += loss.cpu().data[0]        
+    
+    #save scores to data-frame
+    cnn_query_idx = query_idx.cpu().numpy()
+    cnn_retrieved_scores = X_scores.cpu().data.numpy()[:,1:] #skip positive score
+    for row, qidx in enumerate(cnn_query_idx):
+        dev_idx_df.loc[dev_idx_df['query_id'] == qidx, 'cnn_score'] = " ".join(cnn_retrieved_scores[row,:].astype('str'))
+#end for        
+    
+print "total val loss: ", running_val_loss
+print "number of NaN: \n", dev_idx_df.isnull().sum()
+dev_idx_df = dev_idx_df.dropna() #NaNs are due to restriction: range(100)
+
+#save scored data frame
+dev_idx_df.to_csv(SAVE_PATH + '/dev_idx_df_scored_cnn.csv', header=True)
+
+print "computing ranking metrics..."
+cnn_mrr_val = compute_mrr(dev_idx_df, score_name='cnn_score')
+print "cnn MRR (val): ", np.mean(cnn_mrr_val)
+
+cnn_pr1_val = precision_at_k(dev_idx_df, K=1, score_name='cnn_score')
+print "cnn P@1 (val): ", np.mean(cnn_pr1_val)
+
+cnn_pr5_val = precision_at_k(dev_idx_df, K=5, score_name='cnn_score')
+print "cnn P@5 (val): ", np.mean(cnn_pr5_val)
+
+cnn_map_val = compute_map(dev_idx_df, score_name='cnn_score')
+print "cnn map (val): ", np.mean(cnn_map_val)

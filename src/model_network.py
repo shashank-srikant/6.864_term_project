@@ -6,6 +6,9 @@ import torch.autograd as autograd
 from torch.autograd import Variable
 from torch.optim.lr_scheduler import StepLR
 from tqdm import tqdm
+import numpy as np
+import pandas as pd
+
 
 def model_cnn(is_training_phase, num_epochs, data_to_load, idx_df, batch_size, number_negative_examples, model, criterion, optimizer, scheduler, model_name, use_gpu, save_model_at):
     print "Model invoked"
@@ -13,19 +16,19 @@ def model_cnn(is_training_phase, num_epochs, data_to_load, idx_df, batch_size, n
     learning_rate_schedule = []
     patience_cnt = 0
 
+    data_loader = torch.utils.data.DataLoader(
+        data_to_load, 
+        batch_size = batch_size,
+        shuffle = True,
+        num_workers = 4, 
+        drop_last = True)
+
     if not is_training_phase:
         num_epochs = 1
 
     for epoch in range(num_epochs):
         print "epoch value: " + str(epoch)
         loss_over_batches = 0.0
-
-        data_loader = torch.utils.data.DataLoader(
-            data_to_load, 
-            batch_size = batch_size,
-            shuffle = True,
-            num_workers = 4, 
-            drop_last = True)
         
         if is_training_phase:
             model.train()
