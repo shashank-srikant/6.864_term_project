@@ -291,13 +291,13 @@ class RNN(nn.Module):
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
         self.embedding_layer.weight.requires_grad = True  #NOTE: make trainable
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, 
-                            bidirectional=True, batch_first=True)
+                            bidirectional=False, batch_first=True)
         self.hidden = self.init_hidden()
     
     def init_hidden(self):
         #[num_layers, batch_size, hidden_size] for (h_n, c_n)
-        return (Variable(torch.zeros(2, self.batch_size, self.hidden_size)),
-                Variable(torch.zeros(2, self.batch_size, self.hidden_size)))
+        return (Variable(torch.zeros(1, self.batch_size, self.hidden_size)),
+                Variable(torch.zeros(1, self.batch_size, self.hidden_size)))
 
     def forward(self, x_idx):
         all_x = self.embedding_layer(x_idx)
@@ -319,7 +319,7 @@ print model
 
 print "instantiating domain classifier model..."
 #DNN parameters
-dnn_input_dim = hidden_size * 2
+dnn_input_dim = hidden_size 
 dnn_output_dim = NUM_CLASSES
 
 #domain classifier architecture
