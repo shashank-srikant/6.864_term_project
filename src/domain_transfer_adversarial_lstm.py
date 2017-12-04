@@ -318,7 +318,7 @@ print model
 
 print "instantiating domain classifier model..."
 #DNN parameters
-dnn_input_dim = hidden_size
+dnn_input_dim = hidden_size * 2
 dnn_output_dim = NUM_CLASSES
 
 #domain classifier architecture
