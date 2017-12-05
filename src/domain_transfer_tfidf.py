@@ -9,6 +9,7 @@ from time import time
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 
+from meter import AUCMeter 
 from sklearn.metrics import auc
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
@@ -74,6 +75,7 @@ for row_idx in tqdm(range(target_text_df.shape[0])):
 
 print "scoring similarity between target questions..."
 y_true, y_pred = [], []
+auc_meter = AUCMeter()
 for row_idx in tqdm(range(target_pos_df.shape[0])):
     y_true.append(1) #true label (similar)
     
@@ -82,6 +84,7 @@ for row_idx in tqdm(range(target_pos_df.shape[0])):
 
     score = cosine_similarity(target_tfidf_dict[q1_idx], target_tfidf_dict[q2_idx])
     y_pred.append(score[0][0])
+    auc_meter.add(np.array([score[0][0]]),np.array([1]))
 #end for
 
 for row_idx in tqdm(range(target_neg_df.shape[0])):
@@ -92,6 +95,7 @@ for row_idx in tqdm(range(target_neg_df.shape[0])):
 
     score = cosine_similarity(target_tfidf_dict[q1_idx], target_tfidf_dict[q2_idx])
     y_pred.append(score[0][0])
+    auc_meter.add(np.array([score[0][0]]),np.array([0]))
 #end for
 
 roc_auc = roc_auc_score(y_true, y_pred)
@@ -101,7 +105,10 @@ fpr, tpr, thresholds = roc_curve(y_true, y_pred)
 
 idx_fpr_thresh = np.where(fpr < 0.05)[0]
 roc_auc_0p05fpr = auc(fpr[idx_fpr_thresh], tpr[idx_fpr_thresh])
-print "ROC AUC(0.05): ", roc_auc_0p05fpr
+print "ROC AUC(0.05) sklearn: ", roc_auc_0p05fpr
+
+roc_auc_0p05fpr_meter = auc_meter.value(0.05)
+print "ROC AUC(0.05) meter: ", roc_auc_0p05fpr_meter
 
 y_df = pd.DataFrame()
 y_df['y_pred'] = y_pred
