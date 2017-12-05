@@ -171,7 +171,6 @@ def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
         sample['q2_title'] = q2_title_tensor_idx
         sample['q2_body'] = q2_body_tensor_idx
 
-        sample['domain_label'] = 1  #target domain
         target_dataset.append(sample)
     #end for
     return target_dataset 
@@ -249,7 +248,7 @@ print "elapsed time: %.2f sec" %(toc - tic)
 print "instantiating siamese LSTM model..."
 #training parameters
 num_epochs = 16 
-batch_size = 32 
+batch_size = 256 
 
 #RNN parameters
 embed_dim = embeddings.shape[1] #200
@@ -271,7 +270,7 @@ class SIAMESE_RNN(nn.Module):
                             bidirectional=True, batch_first=True)
         self.fc1 = nn.Linear(hidden_size * 2, int(hidden_size * 4.0/3.0))
         self.fc2 = nn.Linear(int(hidden_size * 4.0/3.0), hidden_size)
-        self.dropout = nn.Dropout(0.2) #p=0.2 prob of dropout = (1 - keep prob)  
+        self.dropout = nn.Dropout(0.5) #p=0.2 prob of dropout = (1 - keep prob)  
         self.hidden = self.init_hidden()
     
     def init_hidden(self):
@@ -307,7 +306,6 @@ class ContrastiveLoss(torch.nn.Module):
         self.margin = margin
 
     def forward(self, output1, output2, label):
-        #import pdb; pdb.set_trace()
         euclidean_distance = F.pairwise_distance(output1, output2)
         contrastive_loss = torch.mean((1-label) * torch.pow(euclidean_distance, 2) +
             (label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0),2))
@@ -324,7 +322,7 @@ print "class weights: ", class_weights
 
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 
-criterion = ContrastiveLoss(margin=2.0) 
+criterion = ContrastiveLoss(margin=0.5) 
 optimizer = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
@@ -355,8 +353,7 @@ for epoch in range(num_epochs):
         q2_title = Variable(batch['q2_title'])
         q2_body = Variable(batch['q2_body'])
 
-        label_flat = batch['label'].numpy().ravel()
-        label = Variable(torch.from_numpy(label_flat).type(torch.FloatTensor))
+        label = Variable(batch['label'].view(-1,1).type(torch.FloatTensor))
 
         if use_gpu:
             label = label.cuda()
@@ -412,8 +409,6 @@ if use_gpu:
     model = model.cuda()
 """
 
-import pdb; pdb.set_trace()
-
 print "scoring similarity between target questions..."
 y_true, y_pred_lstm = [], []
 auc_meter = AUCMeter()
@@ -467,14 +462,12 @@ for batch in tqdm(test_data_loader_pos):
 
     lstm_q2 = (lstm_q2_title + lstm_q2_body)/2.0
 
-    cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
-    score_pos = cosine_similarity(lstm_q1, lstm_q2)
+    euclidean_distance = F.pairwise_distance(lstm_q1, lstm_q2) 
+    score_pos_numpy = euclidean_distance.cpu().data.numpy().ravel() 
 
-    score_pos_numpy = score_pos.cpu().data.numpy() #TODO: check (some scores are negative)
-
-    y_true.extend(np.ones(batch_size)) #true label (similar)
+    y_true.extend(np.zeros(batch_size)) #true label (similar) 
     y_pred_lstm.extend(score_pos_numpy.tolist())
-    auc_meter.add(score_pos_numpy, np.ones(batch_size))
+    auc_meter.add(score_pos_numpy, np.zeros(batch_size))
 #end for        
 
 test_data_loader_neg = torch.utils.data.DataLoader(
@@ -526,14 +519,12 @@ for batch in tqdm(test_data_loader_neg):
 
     lstm_q2 = (lstm_q2_title + lstm_q2_body)/2.0
 
-    cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
-    score_neg = cosine_similarity(lstm_q1, lstm_q2)
+    euclidean_distance = F.pairwise_distance(lstm_q1, lstm_q2) 
+    score_neg_numpy = euclidean_distance.cpu().data.numpy().ravel() 
 
-    score_neg_numpy = score_neg.cpu().data.numpy() #TODO: check (some scores are negative)
-
-    y_true.extend(np.zeros(batch_size)) #true label (not similar)
+    y_true.extend(np.ones(batch_size)) #true label (not similar)
     y_pred_lstm.extend(score_neg_numpy.tolist())
-    auc_meter.add(score_neg_numpy, np.zeros(batch_size))
+    auc_meter.add(score_neg_numpy, np.ones(batch_size))
 #end for        
 
 roc_auc = roc_auc_score(y_true, y_pred_lstm)
@@ -547,6 +538,11 @@ print "ROC AUC(0.05) sklearn: ", roc_auc_0p05fpr
 
 roc_auc_0p05fpr_meter = auc_meter.value(0.05)
 print "ROC AUC(0.05) meter: ", roc_auc_0p05fpr_meter
+
+y_df = pd.DataFrame()
+y_df['y_pred'] = y_pred_lstm
+y_df['y_true'] = y_true
+bins = np.linspace(min(y_pred_lstm)-0.1, max(y_pred_lstm)+0.1, 100)
 
 #generate plots
 plt.figure()
@@ -566,5 +562,13 @@ plt.ylabel("Loss")
 plt.legend()
 plt.savefig('../figures/domain_transfer_siamese_loss.png')
 
+plt.figure()
+sns.distplot(y_df[y_df['y_true']==1]['y_pred'], bins, kde=True, norm_hist=True, color='b', label='pos class')
+sns.distplot(y_df[y_df['y_true']==0]['y_pred'], bins, kde=True, norm_hist=True, color='r', label='neg class')
+plt.xlim([0,1])
+plt.legend(loc='upper right')
+plt.ylabel('normalized histogram')
+plt.title('pos and neg class separation')
+plt.savefig('../figures/domain_transfer_direct_lstm_hist.png')
 
 
