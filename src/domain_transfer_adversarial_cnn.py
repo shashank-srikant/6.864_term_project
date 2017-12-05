@@ -24,10 +24,15 @@ from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics.pairwise import cosine_similarity
 
+from meter import AUCMeter
+
 np.random.seed(0)
 
-DATA_PATH_SOURCE = '../data/askubuntu/'
-DATA_PATH_TARGET = '../data/android/'
+#DATA_PATH_SOURCE = '../data/askubuntu/'
+#DATA_PATH_TARGET = '../data/android/'
+
+DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
+DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
 
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
@@ -188,7 +193,7 @@ def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
 #load data
 print "loading source data..."
 tic = time()
-source_text_file = DATA_PATH_SOURCE + '/texts_raw_fixed.txt'
+source_text_file = DATA_PATH_SOURCE + '/text_tokenized.txt'
 source_text_df = pd.read_table(source_text_file, sep='\t', header=None)
 source_text_df.columns = ['id', 'title', 'body']
 source_text_df = source_text_df.dropna()
@@ -209,7 +214,7 @@ print "elapsed time: %.2f sec" %(toc - tic)
 #load data
 print "loading target data..."
 tic = time()
-target_text_file = DATA_PATH_TARGET + '/corpus.txt'
+target_text_file = DATA_PATH_TARGET + '/corpus.tsv'
 target_text_df = pd.read_table(target_text_file, sep='\t', header=None)
 target_text_df.columns = ['id', 'title', 'body']
 target_text_df = target_text_df.dropna()
@@ -374,6 +379,7 @@ training_loss_tot, training_loss_gen, training_loss_dis  = [], [], []
 
 grad_norm_df = pd.DataFrame()
 weight_norm_df = pd.DataFrame()
+
 print "training..."
 for epoch in range(num_epochs):
     
@@ -535,7 +541,8 @@ if use_gpu:
 """
 
 print "scoring similarity between target questions..."
-y_true, y_pred_lstm = [], []
+y_true, y_pred_cnn = [], []
+auc_meter = AUCMeter()
 
 test_data_loader_pos = torch.utils.data.DataLoader(
     target_test_pos_data, 
@@ -577,7 +584,8 @@ for batch in tqdm(test_data_loader_pos):
     score_pos_numpy = score_pos.cpu().data.numpy() #TODO: check (some scores are negative)
 
     y_true.extend(np.ones(batch_size)) #true label (similar)
-    y_pred_lstm.extend(score_pos_numpy.tolist())
+    y_pred_cnn.extend(score_pos_numpy.tolist())
+    auc_meter.add(score_pos_numpy, np.ones(batch_size))
 #end for        
 
 test_data_loader_neg = torch.utils.data.DataLoader(
@@ -620,17 +628,22 @@ for batch in tqdm(test_data_loader_neg):
     score_neg_numpy = score_neg.cpu().data.numpy() #TODO: check (some scores are negative)
 
     y_true.extend(np.zeros(batch_size)) #true label (not similar)
-    y_pred_lstm.extend(score_neg_numpy.tolist())
+    y_pred_cnn.extend(score_neg_numpy.tolist())
+    auc_meter.add(score_neg_numpy, np.ones(batch_size))
 #end for        
 
-roc_auc = roc_auc_score(y_true, y_pred_lstm)
+roc_auc = roc_auc_score(y_true, y_pred_cnn)
 print "area under ROC curve: ", roc_auc
 
-fpr, tpr, thresholds = roc_curve(y_true, y_pred_lstm)
+fpr, tpr, thresholds = roc_curve(y_true, y_pred_cnn)
 
 idx_fpr_thresh = np.where(fpr < 0.05)[0]
 roc_auc_0p05fpr = auc(fpr[idx_fpr_thresh], tpr[idx_fpr_thresh])
 print "ROC AUC(0.05): ", roc_auc_0p05fpr
+
+
+roc_auc_0p05fpr_meter = auc_meter.value(0.05)
+print "ROC AUC(0.05) meter: ", roc_auc_0p05fpr_meter
 
 #generate plots
 plt.figure()
