@@ -26,15 +26,15 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 np.random.seed(0)
 
-DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
-DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
+DATA_PATH_SOURCE = '../data/askubuntu/'
+DATA_PATH_TARGET = '../data/android/'
 
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
 
 NUM_CLASSES = 2
 config = ConfigParser.ConfigParser()
-config.readfp(open(r'config.ini'))
+config.readfp(open(r'../src/config.ini'))
 SAVE_PATH = config.get('paths', 'save_path')
 RNN_SAVE_NAME = config.get('rnn_params', 'save_name')
 CNN_SAVE_NAME = config.get('cnn_params', 'save_name')
@@ -184,10 +184,11 @@ def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
     #end for
     return target_dataset 
 
+
 #load data
 print "loading source data..."
 tic = time()
-source_text_file = DATA_PATH_SOURCE + '/text_tokenized.txt'
+source_text_file = DATA_PATH_SOURCE + '/texts_raw_fixed.txt'
 source_text_df = pd.read_table(source_text_file, sep='\t', header=None)
 source_text_df.columns = ['id', 'title', 'body']
 source_text_df = source_text_df.dropna()
@@ -201,13 +202,14 @@ source_idx_df = pd.read_table(source_idx_file, sep='\t', header=None)
 source_idx_df.columns = ['query_id', 'similar_id', 'random_id']
 source_idx_df = source_idx_df.dropna()
 source_idx_df = source_idx_df.reset_index()
+
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
 #load data
 print "loading target data..."
 tic = time()
-target_text_file = DATA_PATH_TARGET + '/corpus.tsv'
+target_text_file = DATA_PATH_TARGET + '/corpus.txt'
 target_text_df = pd.read_table(target_text_file, sep='\t', header=None)
 target_text_df.columns = ['id', 'title', 'body']
 target_text_df = target_text_df.dropna()
@@ -268,48 +270,45 @@ target_test_neg_data = generate_test_data(target_neg_df, target_text_df, word_to
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
-print "instantiating question encoder LSTM model..."
+print "instantiating question encoder CNN model..."
 #training parameters
-num_epochs = 16 
-batch_size = 32 
+num_epochs = 2 #16 
+batch_size = 8 #32 
 
-#RNN parameters
-embed_dim = embeddings.shape[1] #200
-hidden_size = 128 #hidden vector dim 
+#CNN parameters
+kernel_num = 200
+kernel_sizes = range(2,6)
 weight_decay = 1e-5 
 learning_rate = 1e-3 
+embed_num = len(word_to_idx)
+embed_dim = embeddings.shape[1] #200
 
-#RNN architecture
-class RNN(nn.Module):
-    def __init__(self, embed_dim, hidden_size, vocab_size, batch_size):
-        super(RNN, self).__init__()
-        self.hidden_size = hidden_size
-        self.batch_size = batch_size
+#CNN architecture
+class  CNN(nn.Module):
+    def __init__(self, embed_num, embed_dim, kernel_num, kernel_sizes):
+        super(CNN,self).__init__()
+        V = embed_num
+        D = embed_dim
+        Ci = 1            #input channel
+        Co = kernel_num   #depth
+        Ks = kernel_sizes #height of each filter
 
-        self.embedding_layer = nn.Embedding(vocab_size, embed_dim) 
-        self.embedding_layer.weight.data = torch.from_numpy(embeddings)
-        self.embedding_layer.weight.requires_grad = True  #NOTE: make trainable
-        self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, 
-                            bidirectional=True, batch_first=True)
-        self.hidden = self.init_hidden()
-    
-    def init_hidden(self):
-        #[num_layers, batch_size, hidden_size] for (h_n, c_n)
-        return (Variable(torch.zeros(2, self.batch_size, self.hidden_size)),
-                Variable(torch.zeros(2, self.batch_size, self.hidden_size)))
+        self.embed = nn.Embedding(V, D)
+        self.embed.weight.requires_grad = False
+        self.embed.weight.data = torch.from_numpy(embeddings)
+        self.convs1 = nn.ModuleList([nn.Conv2d(Ci, Co, (K, D)) for K in Ks])
 
-    def forward(self, x_idx):
-        all_x = self.embedding_layer(x_idx)
-        #[batch_size, seq_length (num_words), embed_dim]
-        lstm_out, self.hidden = self.lstm(all_x.view(self.batch_size, x_idx.size(1), -1), self.hidden)
-        h_avg_pool = torch.mean(lstm_out, dim=1)          #average pooling
-        #h_n, c_n = self.hidden[0], self.hidden[1]        #last pooling
-        #h_last_pool = torch.cat([h_n[0], h_n[1]], dim=1) #[batch_size, 2 x hidden_size] 
-        return h_avg_pool 
+    def forward(self, x):
+        x = self.embed(x) # (N,W,D)
+        x = x.unsqueeze(1) # (N,Ci,W,D)
+        x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1] #[(N,Co,W), ...]*len(Ks)
+        x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x] #[(N,Co), ...]*len(Ks)
+        x = torch.cat(x, 1)
+        return x
 
 use_gpu = torch.cuda.is_available()
 
-model = RNN(embed_dim, hidden_size, len(word_to_idx), batch_size)
+model = CNN(embed_num, embed_dim, kernel_num, kernel_sizes)
 if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
@@ -318,6 +317,8 @@ print model
 
 print "instantiating domain classifier model..."
 #DNN parameters
+hidden_size = kernel_num * len(kernel_sizes) #CNN output's dim 
+
 dnn_input_dim = hidden_size
 dnn_output_dim = NUM_CLASSES
 
@@ -361,8 +362,10 @@ model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 
 criterion_gen = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True) #margin=0.3
 criterion_dis = nn.NLLLoss(weight=class_weights_tensor, size_average=True)
+
 optimizer_gen = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
 optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
+
 scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
@@ -371,7 +374,6 @@ training_loss_tot, training_loss_gen, training_loss_dis  = [], [], []
 
 grad_norm_df = pd.DataFrame()
 weight_norm_df = pd.DataFrame()
-
 print "training..."
 for epoch in range(num_epochs):
     
@@ -423,58 +425,35 @@ for epoch in range(num_epochs):
         #question encoder
 
         #query title
-        model.hidden = model.init_hidden() 
-        if use_gpu:
-            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-        lstm_query_title = model(query_title)
-
+        cnn_query_title = model(query_title)
         #query body
-        model.hidden = model.init_hidden() 
-        if use_gpu:
-            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-        lstm_query_body = model(query_body)
-
-        lstm_query = (lstm_query_title + lstm_query_body)/2.0
+        cnn_query_body = model(query_body)
+        cnn_query = (cnn_query_title + cnn_query_body)/2.0
 
         #similar title
-        model.hidden = model.init_hidden() 
-        if use_gpu:
-            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-        lstm_similar_title = model(similar_title)
-
+        cnn_similar_title = model(similar_title)
         #similar body
-        model.hidden = model.init_hidden() 
-        if use_gpu:
-            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-        lstm_similar_body = model(similar_body)
+        cnn_similar_body = model(similar_body)
+        cnn_similar = (cnn_similar_title + cnn_similar_body)/2.0
 
-        lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
-
-        lstm_random_list = []
+        cnn_random_list = []
         for ridx in range(len(random_title_list)):
             #random title
-            model.hidden = model.init_hidden() 
-            if use_gpu:
-                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-            lstm_random_title = model(random_title_list[ridx])
-
+            cnn_random_title = model(random_title_list[ridx])
             #random body
-            model.hidden = model.init_hidden() 
-            if use_gpu:
-                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-            lstm_random_body = model(random_body_list[ridx])
+            cnn_random_body = model(random_body_list[ridx])
 
-            lstm_random = (lstm_random_title + lstm_random_body)/2.0
-            lstm_random_list.append(lstm_random)
+            cnn_random = (cnn_random_title + cnn_random_body)/2.0
+            cnn_random_list.append(cnn_random)
         #end for
            
         cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
-        score_pos = cosine_similarity(lstm_query, lstm_similar)
+        score_pos = cosine_similarity(cnn_query, cnn_similar)
 
         score_list = []
         score_list.append(score_pos)
-        for ridx in range(len(lstm_random_list)):
-            score_neg = cosine_similarity(lstm_query, lstm_random_list[ridx])
+        for ridx in range(len(cnn_random_list)):
+            score_neg = cosine_similarity(cnn_query, cnn_random_list[ridx])
             score_list.append(score_neg)
 
         X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
@@ -485,13 +464,13 @@ for epoch in range(num_epochs):
 
 
         #domain classifier
-        y_clf_query = domain_clf(lstm_query)
-        y_clf_similar = domain_clf(lstm_similar)
+        y_clf_query = domain_clf(cnn_query)
+        y_clf_similar = domain_clf(cnn_similar)
 
         y_clf_random_list = []
-        for ridx in range(len(lstm_random_list)):
-            lstm_random = lstm_random_list[ridx]
-            y_clf_random = domain_clf(lstm_random)
+        for ridx in range(len(cnn_random_list)):
+            cnn_random = cnn_random_list[ridx]
+            y_clf_random = domain_clf(cnn_random)
             y_clf_random_list.append(y_clf_random)
         #end for
 
@@ -580,35 +559,20 @@ for batch in tqdm(test_data_loader_pos):
         q2_title, q2_body = q2_title.cuda(), q2_body.cuda()
 
     #q1 title
-    model.hidden = model.init_hidden() 
-    if use_gpu:
-        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-    lstm_q1_title = model(q1_title)
-
+    cnn_q1_title = model(q1_title)
     #q1 body
-    model.hidden = model.init_hidden() 
-    if use_gpu:
-        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-    lstm_q1_body = model(q1_body)
+    cnn_q1_body = model(q1_body)
 
-    lstm_q1 = (lstm_q1_title + lstm_q1_body)/2.0
+    cnn_q1 = (cnn_q1_title + cnn_q1_body)/2.0
 
     #q2 title
-    model.hidden = model.init_hidden() 
-    if use_gpu:
-        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-    lstm_q2_title = model(q2_title)
-
+    cnn_q2_title = model(q2_title)
     #q2 body
-    model.hidden = model.init_hidden() 
-    if use_gpu:
-        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-    lstm_q2_body = model(q2_body)
-
-    lstm_q2 = (lstm_q2_title + lstm_q2_body)/2.0
+    cnn_q2_body = model(q2_body)
+    cnn_q2 = (cnn_q2_title + cnn_q2_body)/2.0
 
     cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
-    score_pos = cosine_similarity(lstm_q1, lstm_q2)
+    score_pos = cosine_similarity(cnn_q1, cnn_q2)
 
     score_pos_numpy = score_pos.cpu().data.numpy() #TODO: check (some scores are negative)
 
@@ -624,7 +588,6 @@ test_data_loader_neg = torch.utils.data.DataLoader(
     drop_last = True)
         
 for batch in tqdm(test_data_loader_neg):
-
     q1_idx = batch['q1_idx']
     q1_title = Variable(batch['q1_title'])
     q1_body = Variable(batch['q1_body'])
@@ -638,35 +601,21 @@ for batch in tqdm(test_data_loader_neg):
         q2_title, q2_body = q2_title.cuda(), q2_body.cuda()
 
     #q1 title
-    model.hidden = model.init_hidden() 
-    if use_gpu:
-        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-    lstm_q1_title = model(q1_title)
-
+    cnn_q1_title = model(q1_title)
     #q1 body
-    model.hidden = model.init_hidden() 
-    if use_gpu:
-        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-    lstm_q1_body = model(q1_body)
+    cnn_q1_body = model(q1_body)
 
-    lstm_q1 = (lstm_q1_title + lstm_q1_body)/2.0
+    cnn_q1 = (cnn_q1_title + cnn_q1_body)/2.0
 
     #q2 title
-    model.hidden = model.init_hidden() 
-    if use_gpu:
-        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-    lstm_q2_title = model(q2_title)
-
+    cnn_q2_title = model(q2_title)
     #q2 body
-    model.hidden = model.init_hidden() 
-    if use_gpu:
-        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-    lstm_q2_body = model(q2_body)
+    cnn_q2_body = model(q2_body)
 
-    lstm_q2 = (lstm_q2_title + lstm_q2_body)/2.0
+    cnn_q2 = (cnn_q2_title + cnn_q2_body)/2.0
 
     cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
-    score_neg = cosine_similarity(lstm_q1, lstm_q2)
+    score_neg = cosine_similarity(cnn_q1, cnn_q2)
 
     score_neg_numpy = score_neg.cpu().data.numpy() #TODO: check (some scores are negative)
 
@@ -687,50 +636,52 @@ print "ROC AUC(0.05): ", roc_auc_0p05fpr
 plt.figure()
 plt.plot(fpr, tpr, c='b', lw=2.0, label='ROC curve (area = %0.2f)' % roc_auc)
 plt.plot([0, 1], [0, 1], c='k', lw=2.0, linestyle='--')
-plt.title('LSTM Adversarial Domain Transfer')
+plt.title('CNN Adversarial Domain Transfer')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
-plt.savefig('../figures/domain_transfer_adversarial_lstm.png')
+plt.savefig('../figures/cnn_domain_transfer_adversarial_lstm.png')
+#plt.show()
 
 plt.figure()
 plt.plot(lambda_list)
-plt.title('lambda schedule')
+plt.title('CNN lambda schedule')
 plt.xlabel('epoch')
 plt.ylabel('lambda')
-plt.savefig('../figures/domain_transfer_adversarial_lambda.png')
+plt.savefig('../figures/cnn_domain_transfer_adversarial_lambda.png')
+#plt.show()
 
 plt.figure()
 plt.plot(training_loss_tot, label='total loss')
 plt.plot(training_loss_gen, label='generator loss')
 plt.plot(training_loss_dis, label='discriminator loss')
-plt.title("Adversarial Domain Transfer Training Loss")
+plt.title("CNN Adversarial Domain Transfer Training Loss")
 plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.legend()
-plt.savefig('../figures/domain_transfer_adversarial_loss.png')
+plt.savefig('../figures/cnn_domain_transfer_adversarial_loss.png')
+#plt.show()
 
 plt.figure()
 plt.plot(grad_norm_df['w1_grad_l2'], c='r', alpha=0.8, label='w1 grad l2')
 plt.plot(grad_norm_df['w2_grad_l2'], c='b', alpha=0.8, label='w2 grad l2')
 plt.plot(grad_norm_df['w3_grad_l2'], c='g', alpha=0.8, label='w3 grad l2')
 plt.plot(grad_norm_df['w4_grad_l2'], c='k', alpha=0.8, label='w4 grad l2')
-plt.title('domain classifier gradient norm')
+plt.title('cnn domain classifier gradient norm')
 plt.xlabel('num batches')
 plt.ylabel('l2 norm')
 plt.legend()
-plt.savefig('../figures/domain_transfer_adversarial_gradient_norm.png')
+plt.savefig('../figures/cnn_domain_transfer_adversarial_gradient_norm.png')
+#plt.show()
 
 plt.figure()
 plt.plot(weight_norm_df['w1_data_l2'], c='r', alpha=0.8, label='w1 data l2')
 plt.plot(weight_norm_df['w2_data_l2'], c='b', alpha=0.8, label='w2 data l2')
 plt.plot(weight_norm_df['w3_data_l2'], c='g', alpha=0.8, label='w3 data l2')
 plt.plot(weight_norm_df['w4_data_l2'], c='k', alpha=0.8, label='w4 data l2')
-plt.title('domain classifier weight norm')
+plt.title('cnn domain classifier weight norm')
 plt.xlabel('num batches')
 plt.ylabel('l2 norm')
 plt.legend()
-plt.savefig('../figures/domain_transfer_adversarial_weight_norm.png')
-
-
-
+plt.savefig('../figures/cnn_domain_transfer_adversarial_weight_norm.png')
+#plt.show()
