@@ -322,6 +322,12 @@ print "class weights: ", class_weights
 
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 
+tot_num_params = 0
+for param in model_parameters:
+    tot_num_params += np.prod(param.size())
+#end for
+print "number of trainable params: ", tot_num_params
+
 criterion = ContrastiveLoss(margin=0.5) 
 optimizer = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
