@@ -246,8 +246,6 @@ target_test_neg_data = generate_test_data(target_neg_df, target_text_df, word_to
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
-import pdb; pdb.set_trace()
-
 print "instantiating siamese LSTM model..."
 #training parameters
 num_epochs = 16 
@@ -281,7 +279,7 @@ class SIAMESE_RNN(nn.Module):
         return (Variable(torch.zeros(2, self.batch_size, self.hidden_size)),
                 Variable(torch.zeros(2, self.batch_size, self.hidden_size)))
 
-    def forward_once(self, x_idx):
+    def forward(self, x_idx):
         all_x = self.embedding_layer(x_idx)
         #[batch_size, seq_length (num_words), embed_dim]
         lstm_out, self.hidden = self.lstm(all_x.view(self.batch_size, x_idx.size(1), -1), self.hidden)
@@ -293,11 +291,6 @@ class SIAMESE_RNN(nn.Module):
         x = self.fc2(x)
         return x 
 
-    def forward(self, input1, input2):
-        out1 = self.forward_once(input1)
-        out2 = self.forward_once(input2)
-        return out1, out2
-
 use_gpu = torch.cuda.is_available()
 
 model = SIAMESE_RNN(embed_dim, hidden_size, len(word_to_idx), batch_size)
@@ -308,7 +301,21 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-class_weights = np.array([num_source_domain, num_target_domain], dtype=np.float32)
+class ContrastiveLoss(torch.nn.Module):
+    def __init__(self, margin=2.0):
+        super(ContrastiveLoss, self).__init__()
+        self.margin = margin
+
+    def forward(self, output1, output2, label):
+        #import pdb; pdb.set_trace()
+        euclidean_distance = F.pairwise_distance(output1, output2)
+        contrastive_loss = torch.mean((1-label) * torch.pow(euclidean_distance, 2) +
+            (label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0),2))
+
+        return contrastive_loss
+
+
+class_weights = np.array([num_source_pos, num_source_neg], dtype=np.float32) #TODO: check order
 class_weights = sum(class_weights) / class_weights
 class_weights_tensor = torch.from_numpy(class_weights)
 if use_gpu:
@@ -317,25 +324,16 @@ print "class weights: ", class_weights
 
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 
-criterion_gen = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True) #margin=0.3
-criterion_dis = nn.NLLLoss(weight=class_weights_tensor, size_average=True)
-optimizer_gen = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
-optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
-scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
-scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rate every 4 epochs
+criterion = ContrastiveLoss(margin=2.0) 
+optimizer = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
+scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
-lambda_list = []
-training_loss_tot, training_loss_gen, training_loss_dis  = [], [], []
-
-grad_norm_df = pd.DataFrame()
-weight_norm_df = pd.DataFrame()
+training_loss = []
 
 print "training..."
 for epoch in range(num_epochs):
     
-    running_train_loss_tot = 0.0
-    running_train_loss_gen = 0.0
-    running_train_loss_dis = 0.0
+    running_train_loss = 0.0
 
     train_data_loader = torch.utils.data.DataLoader(
         train_data_combined, 
@@ -345,173 +343,76 @@ for epoch in range(num_epochs):
         drop_last = True)
         
     model.train()
-    domain_clf.train()
-
-    scheduler_gen.step() 
-    scheduler_dis.step()
+    scheduler.step() 
         
-    for bidx, batch in enumerate(tqdm(train_data_loader)):
-      
-        query_title = Variable(batch['query_title'])
-        query_body = Variable(batch['query_body'])
-        similar_title = Variable(batch['similar_title'])
-        similar_body = Variable(batch['similar_body'])
-        
-        domain_label_flat = batch['domain_label'].numpy().ravel()
-        domain_label = Variable(torch.from_numpy(domain_label_flat))
+    for batch in tqdm(train_data_loader):
+     
+        q1_idx = batch['q1_idx']
+        q1_title = Variable(batch['q1_title'])
+        q1_body = Variable(batch['q1_body'])
+       
+        q2_idx = batch['q2_idx']
+        q2_title = Variable(batch['q2_title'])
+        q2_body = Variable(batch['q2_body'])
 
-        random_title_list = []
-        random_body_list = []
-        for ridx in range(NUM_NEGATIVE): #100, number of random (negative) examples 
-            random_title_name = 'random_title_' + str(ridx)
-            random_body_name = 'random_body_' + str(ridx)
-            random_title_list.append(Variable(batch[random_title_name]))
-            random_body_list.append(Variable(batch[random_body_name]))
+        label_flat = batch['label'].numpy().ravel()
+        label = Variable(torch.from_numpy(label_flat).type(torch.FloatTensor))
 
         if use_gpu:
-            domain_label = domain_label.cuda()
-            query_title, query_body = query_title.cuda(), query_body.cuda()
-            similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
-            random_title_list = map(lambda item: item.cuda(), random_title_list)
-            random_body_list = map(lambda item: item.cuda(), random_body_list)
-        
-        optimizer_gen.zero_grad() 
-        optimizer_dis.zero_grad() 
+            label = label.cuda()
+            q1_title, q1_body = q1_title.cuda(), q1_body.cuda()
+            q2_title, q2_body = q2_title.cuda(), q2_body.cuda()
 
-        #question encoder
+        optimizer.zero_grad() 
 
-        #query title
+        #q1 title
         model.hidden = model.init_hidden() 
         if use_gpu:
             model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-        lstm_query_title = model(query_title)
+        lstm_q1_title = model(q1_title)
 
-        #query body
+        #q1 body
         model.hidden = model.init_hidden() 
         if use_gpu:
             model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-        lstm_query_body = model(query_body)
+        lstm_q1_body = model(q1_body)
 
-        lstm_query = (lstm_query_title + lstm_query_body)/2.0
+        lstm_q1 = (lstm_q1_title + lstm_q1_body)/2.0
 
-        #similar title
+        #q2 title
         model.hidden = model.init_hidden() 
         if use_gpu:
             model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-        lstm_similar_title = model(similar_title)
+        lstm_q2_title = model(q2_title)
 
         #similar body
         model.hidden = model.init_hidden() 
         if use_gpu:
             model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-        lstm_similar_body = model(similar_body)
+        lstm_q2_body = model(q2_body)
 
-        lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
+        lstm_q2 = (lstm_q2_title + lstm_q2_body)/2.0
 
-        lstm_random_list = []
-        for ridx in range(len(random_title_list)):
-            #random title
-            model.hidden = model.init_hidden() 
-            if use_gpu:
-                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-            lstm_random_title = model(random_title_list[ridx])
-
-            #random body
-            model.hidden = model.init_hidden() 
-            if use_gpu:
-                model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
-            lstm_random_body = model(random_body_list[ridx])
-
-            lstm_random = (lstm_random_title + lstm_random_body)/2.0
-            lstm_random_list.append(lstm_random)
-        #end for
-           
-        cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
-        score_pos = cosine_similarity(lstm_query, lstm_similar)
-
-        score_list = []
-        score_list.append(score_pos)
-        for ridx in range(len(lstm_random_list)):
-            score_neg = cosine_similarity(lstm_query, lstm_random_list[ridx])
-            score_list.append(score_neg)
-
-        X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
-        y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
-        if use_gpu:
-            y_targets = y_targets.cuda()
-        loss_gen = criterion_gen(X_scores, y_targets) #y_target=0
-
-
-        #domain classifier
-        y_clf_query = domain_clf(lstm_query)
-        y_clf_similar = domain_clf(lstm_similar)
-
-        y_clf_random_list = []
-        for ridx in range(len(lstm_random_list)):
-            lstm_random = lstm_random_list[ridx]
-            y_clf_random = domain_clf(lstm_random)
-            y_clf_random_list.append(y_clf_random)
-        #end for
-
-        loss_dis_query = criterion_dis(y_clf_query, domain_label)
-        loss_dis_similar = criterion_dis(y_clf_similar, domain_label)
-
-        loss_dis_random_list = []
-        for ridx in range(len(y_clf_random_list)):
-            y_clf_random = y_clf_random_list[ridx]
-            loss_dis_random = criterion_dis(y_clf_random, domain_label)
-            loss_dis_random_list.append(loss_dis_random)
-        #end for
-        loss_dis = loss_dis_query + loss_dis_similar + sum(loss_dis_random_list)
-
-        #compute total loss
-        lambda_k = lambda_schedule(epoch)
-        if use_gpu:
-            lambda_k = lambda_k.cuda()
-
-        loss_tot = loss_gen - 1e-4 * loss_dis  #NOTE: keep lambda_k=1e-4 fixed
-
-        loss_tot.backward()   #call backward() once
-        optimizer_gen.step()  #min loss_tot: min loss_gen, max loss_dis
-        optimizer_dis.step()  #min loss_dis: update domain clf params with negative learning rate
-                
-        running_train_loss_tot += loss_tot.cpu().data[0]        
-        running_train_loss_gen += loss_gen.cpu().data[0]        
-        running_train_loss_dis += loss_dis.cpu().data[0]        
+        loss = criterion(lstm_q1, lstm_q2, label) 
         
-        #gradient and weight norms 
-        df_idx = bidx + epoch * batch_size
-        grad_norm_df.loc[df_idx, 'df_idx'] = df_idx
-        weight_norm_df.loc[df_idx, 'df_idx'] = df_idx
-        
-        grad_norm_df.loc[df_idx,'w1_grad_l2'] = torch.norm(domain_clf.fc1.weight.grad, 2).cpu().data[0] 
-        weight_norm_df.loc[df_idx,'w1_data_l2'] = torch.norm(domain_clf.fc1.weight, 2).cpu().data[0]
-
-        grad_norm_df.loc[df_idx,'w2_grad_l2'] = torch.norm(domain_clf.fc2.weight.grad, 2).cpu().data[0] 
-        weight_norm_df.loc[df_idx,'w2_data_l2'] = torch.norm(domain_clf.fc2.weight, 2).cpu().data[0] 
-
-        grad_norm_df.loc[df_idx,'w3_grad_l2'] = torch.norm(domain_clf.fc3.weight.grad, 2).cpu().data[0] 
-        weight_norm_df.loc[df_idx,'w3_data_l2'] = torch.norm(domain_clf.fc3.weight, 2).cpu().data[0] 
-        
-        grad_norm_df.loc[df_idx,'w4_grad_l2'] = torch.norm(domain_clf.fc4.weight.grad, 2).cpu().data[0] 
-        weight_norm_df.loc[df_idx,'w4_data_l2'] = torch.norm(domain_clf.fc4.weight, 2).cpu().data[0] 
-        
+        loss.backward() 
+        optimizer.step()
+        running_train_loss += loss.cpu().data[0]        
     #end for
-    lambda_list.append(lambda_k.cpu().data[0])
-    training_loss_tot.append(running_train_loss_tot)
-    training_loss_gen.append(running_train_loss_gen)
-    training_loss_dis.append(running_train_loss_dis)
-    print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss_tot)
+    training_loss.append(running_train_loss)
+    print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
     
-    torch.save(model, SAVE_PATH + '/adversarial_domain_transfer.pt')
+    torch.save(model, SAVE_PATH + '/domain_transfer_siamese.pt')
 #end for
 """
 print "loading pre-trained model..."
-model = torch.load(SAVE_PATH + '/adversarial_domain_transfer.pt')
+model = torch.load(SAVE_PATH + '/domain_transfer_siamese.pt')
 if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
 """
+
+import pdb; pdb.set_trace()
 
 print "scoring similarity between target questions..."
 y_true, y_pred_lstm = [], []
@@ -651,50 +552,19 @@ print "ROC AUC(0.05) meter: ", roc_auc_0p05fpr_meter
 plt.figure()
 plt.plot(fpr, tpr, c='b', lw=2.0, label='ROC curve (area = %0.2f)' % roc_auc)
 plt.plot([0, 1], [0, 1], c='k', lw=2.0, linestyle='--')
-plt.title('LSTM Adversarial Domain Transfer')
+plt.title('Siamese LSTM Domain Transfer')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
-plt.savefig('../figures/domain_transfer_adversarial_lstm.png')
+plt.savefig('../figures/domain_transfer_siamese.png')
 
 plt.figure()
-plt.plot(lambda_list)
-plt.title('lambda schedule')
-plt.xlabel('epoch')
-plt.ylabel('lambda')
-plt.savefig('../figures/domain_transfer_adversarial_lambda.png')
-
-plt.figure()
-plt.plot(training_loss_tot, label='total loss')
-plt.plot(training_loss_gen, label='generator loss')
-plt.plot(training_loss_dis, label='discriminator loss')
-plt.title("Adversarial Domain Transfer Training Loss")
+plt.plot(training_loss, label='loss')
+plt.title("Siamese LSTM Domain Transfer Training Loss")
 plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.legend()
-plt.savefig('../figures/domain_transfer_adversarial_loss.png')
-
-plt.figure()
-plt.plot(grad_norm_df['w1_grad_l2'], c='r', alpha=0.8, label='w1 grad l2')
-plt.plot(grad_norm_df['w2_grad_l2'], c='b', alpha=0.8, label='w2 grad l2')
-plt.plot(grad_norm_df['w3_grad_l2'], c='g', alpha=0.8, label='w3 grad l2')
-plt.plot(grad_norm_df['w4_grad_l2'], c='k', alpha=0.8, label='w4 grad l2')
-plt.title('domain classifier gradient norm')
-plt.xlabel('num batches')
-plt.ylabel('l2 norm')
-plt.legend()
-plt.savefig('../figures/domain_transfer_adversarial_gradient_norm.png')
-
-plt.figure()
-plt.plot(weight_norm_df['w1_data_l2'], c='r', alpha=0.8, label='w1 data l2')
-plt.plot(weight_norm_df['w2_data_l2'], c='b', alpha=0.8, label='w2 data l2')
-plt.plot(weight_norm_df['w3_data_l2'], c='g', alpha=0.8, label='w3 data l2')
-plt.plot(weight_norm_df['w4_data_l2'], c='k', alpha=0.8, label='w4 data l2')
-plt.title('domain classifier weight norm')
-plt.xlabel('num batches')
-plt.ylabel('l2 norm')
-plt.legend()
-plt.savefig('../figures/domain_transfer_adversarial_weight_norm.png')
+plt.savefig('../figures/domain_transfer_siamese_loss.png')
 
 
 
