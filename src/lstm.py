@@ -114,6 +114,9 @@ print model
 
 #define loss and optimizer
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+lstm_num_params = sum([np.prod(p.size()) for p in model_parameters])
+print "number of trainable params: ", lstm_num_params
+
 criterion = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True)
 optimizer = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
@@ -252,6 +255,130 @@ if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
 """
+
+print "scoring val questions..."
+running_val_loss = 0.0
+
+val_data_loader = torch.utils.data.DataLoader(
+    val_data, 
+    batch_size = batch_size,
+    shuffle = False,
+    num_workers = 4, 
+    drop_last = True)
+        
+model.eval()
+
+for batch in tqdm(val_data_loader):
+
+    query_idx = batch['query_idx']
+    query_title = Variable(batch['query_title'])
+    query_body = Variable(batch['query_body'])
+    similar_title = Variable(batch['similar_title'])
+    similar_body = Variable(batch['similar_body'])
+
+    random_title_list = []
+    random_body_list = []
+    for ridx in range(20): #number of retrieved (bm25) examples 
+        random_title_name = 'random_title_' + str(ridx)
+        random_body_name = 'random_body_' + str(ridx)
+        random_title_list.append(Variable(batch[random_title_name]))
+        random_body_list.append(Variable(batch[random_body_name]))
+
+    if use_gpu:
+        query_title, query_body = query_title.cuda(), query_body.cuda()
+        similar_title, similar_body = similar_title.cuda(), similar_body.cuda()
+        random_title_list = map(lambda item: item.cuda(), random_title_list)
+        random_body_list = map(lambda item: item.cuda(), random_body_list)
+
+    #query title
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+    lstm_query_title = model(query_title)
+
+    #query body
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+    lstm_query_body = model(query_body)
+
+    lstm_query = (lstm_query_title + lstm_query_body)/2.0
+
+    #similar title
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+    lstm_similar_title = model(similar_title)
+
+    #similar body
+    model.hidden = model.init_hidden() 
+    if use_gpu:
+        model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+    lstm_similar_body = model(similar_body)
+
+    lstm_similar = (lstm_similar_title + lstm_similar_body)/2.0
+
+    lstm_random_list = []
+    for ridx in range(len(random_title_list)):
+        #random title
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+        lstm_random_title = model(random_title_list[ridx])
+
+        #random body
+        model.hidden = model.init_hidden() 
+        if use_gpu:
+            model.hidden = tuple(map(lambda item: item.cuda(), model.hidden))
+        lstm_random_body = model(random_body_list[ridx])
+
+        lstm_random = (lstm_random_title + lstm_random_body)/2.0
+        lstm_random_list.append(lstm_random)
+    #end for
+           
+    cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+    score_pos = cosine_similarity(lstm_query, lstm_similar)
+
+    score_list = []
+    score_list.append(score_pos)
+    for ridx in range(len(lstm_random_list)):
+        score_neg = cosine_similarity(lstm_query, lstm_random_list[ridx])
+        score_list.append(score_neg)
+
+    X_scores = torch.stack(score_list, 1) #[batch_size, K=101]
+    y_targets = Variable(torch.zeros(X_scores.size(0)).type(torch.LongTensor)) #[batch_size]
+    if use_gpu:
+        y_targets = y_targets.cuda()
+    loss = criterion(X_scores, y_targets) #y_target=0
+    running_val_loss += loss.cpu().data[0]        
+    
+    #save scores to data frame
+    lstm_query_idx = query_idx.cpu().numpy()
+    lstm_retrieved_scores = X_scores.cpu().data.numpy()[:,1:] #skip positive score
+    for row, qidx in enumerate(lstm_query_idx):
+        dev_idx_df.loc[dev_idx_df['query_id'] == qidx, 'lstm_score'] = " ".join(lstm_retrieved_scores[row,:].astype('str'))
+#end for        
+    
+print "total val loss: ", running_val_loss
+print "number of NaN: \n", dev_idx_df.isnull().sum()
+dev_idx_df = dev_idx_df.dropna() #NaNs are due to restriction: range(100)
+
+#save scored data frame
+dev_idx_df.to_csv(SAVE_PATH + '/dev_idx_df_scored_lstm.csv', header=True)
+
+print "computing ranking metrics..."
+lstm_mrr_val = compute_mrr(dev_idx_df, score_name='lstm_score')
+print "lstm MRR (val): ", np.mean(lstm_mrr_val)
+
+lstm_pr1_val = precision_at_k(dev_idx_df, K=1, score_name='lstm_score')
+print "lstm P@1 (val): ", np.mean(lstm_pr1_val)
+
+lstm_pr5_val = precision_at_k(dev_idx_df, K=5, score_name='lstm_score')
+print "lstm P@5 (val): ", np.mean(lstm_pr5_val)
+
+lstm_map_val = compute_map(dev_idx_df, score_name='lstm_score')
+print "lstm map (val): ", np.mean(lstm_map_val)
+
 
 print "scoring test questions..."
 running_test_loss = 0.0
@@ -393,14 +520,4 @@ plt.xlabel("Epoch")
 plt.ylabel("Learning rate")
 plt.legend()
 plt.savefig('../figures/lstm_learning_rate_schedule.png')
-
-"""
-plt.figure()
-plt.plot(validation_loss, label='Adam')
-plt.title("LSTM Model Validation Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Validation Loss")
-plt.legend()
-plt.savefig('./figures/lstm_validation_loss.png')
-"""
 
