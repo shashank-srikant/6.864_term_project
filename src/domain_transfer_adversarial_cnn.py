@@ -29,11 +29,11 @@ from meter import AUCMeter
 np.random.seed(0)
 torch.manual_seed(0)
 
-DATA_PATH_SOURCE = '../data/askubuntu/'
-DATA_PATH_TARGET = '../data/android/'
+#DATA_PATH_SOURCE = '../data/askubuntu/'
+#DATA_PATH_TARGET = '../data/android/'
 
-#DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
-#DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
+DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
+DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
 
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
@@ -193,7 +193,8 @@ def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
 #load data
 print "loading source data..."
 tic = time()
-source_text_file = DATA_PATH_SOURCE + '/texts_raw_fixed.txt'
+#source_text_file = DATA_PATH_SOURCE + '/texts_raw_fixed.txt'
+source_text_file = DATA_PATH_SOURCE + '/text_tokenized.txt'
 source_text_df = pd.read_table(source_text_file, sep='\t', header=None)
 source_text_df.columns = ['id', 'title', 'body']
 source_text_df = source_text_df.dropna()
@@ -214,7 +215,8 @@ print "elapsed time: %.2f sec" %(toc - tic)
 #load data
 print "loading target data..."
 tic = time()
-target_text_file = DATA_PATH_TARGET + '/corpus.txt'
+#target_text_file = DATA_PATH_TARGET + '/corpus.txt'
+target_text_file = DATA_PATH_TARGET + '/corpus.tsv'
 target_text_df = pd.read_table(target_text_file, sep='\t', header=None)
 target_text_df.columns = ['id', 'title', 'body']
 target_text_df = target_text_df.dropna()
@@ -365,7 +367,7 @@ print "class weights: ", class_weights
 
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 
-criterion_gen = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True) #margin=0.3
+criterion_gen = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True) 
 criterion_dis = nn.NLLLoss(weight=class_weights_tensor, size_average=True)
 
 optimizer_gen = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
@@ -496,7 +498,7 @@ for epoch in range(num_epochs):
         if use_gpu:
             lambda_k = lambda_k.cuda()
 
-        loss_tot = loss_gen - 1e-4 * loss_dis  #NOTE: keep lambda_k=1e-4 fixed
+        loss_tot = loss_gen - 1e-3 * loss_dis  #NOTE: keep lambda_k=1e-4 fixed
 
         loss_tot.backward()   #call backward() once
         optimizer_gen.step()  #min loss_tot: min loss_gen, max loss_dis
