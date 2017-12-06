@@ -28,11 +28,11 @@ from meter import AUCMeter
 
 np.random.seed(0)
 
-#DATA_PATH_SOURCE = '../data/askubuntu/'
-#DATA_PATH_TARGET = '../data/android/'
+DATA_PATH_SOURCE = '../data/askubuntu/'
+DATA_PATH_TARGET = '../data/android/'
 
-DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
-DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
+#DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
+#DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
 
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
@@ -154,8 +154,8 @@ def generate_train_data(data_frame, train_text_df, word_to_idx, tokenizer, num_s
 def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
 
     target_dataset = []
-    #for idx in tqdm(range(data_frame.shape[0])):
-    for idx in tqdm(range(1000)):
+    for idx in tqdm(range(data_frame.shape[0])):
+    #for idx in tqdm(range(1000)):
         q1_id = data_frame.loc[idx, 'id_1']
         q2_id = data_frame.loc[idx, 'id_2']
 
@@ -193,7 +193,7 @@ def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
 #load data
 print "loading source data..."
 tic = time()
-source_text_file = DATA_PATH_SOURCE + '/text_tokenized.txt'
+source_text_file = DATA_PATH_SOURCE + '/texts_raw_fixed.txt'
 source_text_df = pd.read_table(source_text_file, sep='\t', header=None)
 source_text_df.columns = ['id', 'title', 'body']
 source_text_df = source_text_df.dropna()
@@ -214,7 +214,7 @@ print "elapsed time: %.2f sec" %(toc - tic)
 #load data
 print "loading target data..."
 tic = time()
-target_text_file = DATA_PATH_TARGET + '/corpus.tsv'
+target_text_file = DATA_PATH_TARGET + '/corpus.txt'
 target_text_df = pd.read_table(target_text_file, sep='\t', header=None)
 target_text_df.columns = ['id', 'title', 'body']
 target_text_df = target_text_df.dropna()
@@ -277,8 +277,8 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 print "instantiating question encoder CNN model..."
 #training parameters
-num_epochs = 2 #16 
-batch_size = 8 #32 
+num_epochs = 16 
+batch_size = 32 
 
 #CNN parameters
 kernel_num = 200
@@ -629,7 +629,7 @@ for batch in tqdm(test_data_loader_neg):
 
     y_true.extend(np.zeros(batch_size)) #true label (not similar)
     y_pred_cnn.extend(score_neg_numpy.tolist())
-    auc_meter.add(score_neg_numpy, np.ones(batch_size))
+    auc_meter.add(score_neg_numpy, np.zeros(batch_size))
 #end for        
 
 roc_auc = roc_auc_score(y_true, y_pred_cnn)
