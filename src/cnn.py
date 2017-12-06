@@ -54,7 +54,7 @@ batch_size = 32
 #model parameters
 embed_num = len(word_to_idx)
 embed_dim = len(embeddings[0])
-kernel_num = 200  #TODO: tune
+kernel_num = 300  #TODO: tune
 kernel_sizes = range(2,6)
 learning_rate = 1e-3 
 weight_decay = 1e-5
@@ -77,7 +77,7 @@ class  CNN(nn.Module):
         x = self.embed(x) # (N,W,D)
         x = x.unsqueeze(1) # (N,Ci,W,D)
         x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1] #[(N,Co,W), ...]*len(Ks)
-        x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x] #[(N,Co), ...]*len(Ks)
+        x = [F.avg_pool1d(i, i.size(2)).squeeze(2) for i in x] #[(N,Co), ...]*len(Ks)
         x = torch.cat(x, 1)
         return x
 
@@ -91,7 +91,7 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-criterion = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True)
+criterion = nn.MultiMarginLoss(p=1, margin=0.5, size_average=True)
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 optimizer = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
