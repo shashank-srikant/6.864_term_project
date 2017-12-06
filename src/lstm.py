@@ -114,11 +114,7 @@ print model
 
 #define loss and optimizer
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
-
-lstm_num_params = 0
-for param in model_parameters:
-    lstm_num_params += np.prod(param.size())
-#end for
+lstm_num_params = sum([np.prod(p.size()) for p in model_parameters])
 print "number of trainable params: ", lstm_num_params
 
 criterion = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True)
