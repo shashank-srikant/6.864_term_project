@@ -27,6 +27,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from meter import AUCMeter
 
 np.random.seed(0)
+torch.manual_seed(0)
 
 #DATA_PATH_SOURCE = '../data/askubuntu/'
 #DATA_PATH_TARGET = '../data/android/'
@@ -154,8 +155,7 @@ def generate_train_data(data_frame, train_text_df, word_to_idx, tokenizer, num_s
 def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
 
     target_dataset = []
-    #for idx in tqdm(range(data_frame.shape[0])):
-    for idx in tqdm(range(1000)):
+    for idx in tqdm(range(data_frame.shape[0])):
         q1_id = data_frame.loc[idx, 'id_1']
         q2_id = data_frame.loc[idx, 'id_2']
 
@@ -277,8 +277,8 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 print "instantiating question encoder CNN model..."
 #training parameters
-num_epochs = 2 #16 
-batch_size = 8 #32 
+num_epochs =  8 #2
+batch_size = 32 #8
 
 #CNN parameters
 kernel_num = 200
@@ -530,11 +530,11 @@ for epoch in range(num_epochs):
     training_loss_dis.append(running_train_loss_dis)
     print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss_tot)
     
-    torch.save(model, SAVE_PATH + '/adversarial_domain_transfer.pt')
+    torch.save(model, SAVE_PATH + '/adversarial_domain_transfer_cnn.pt')
 #end for
 """
 print "loading pre-trained model..."
-model = torch.load(SAVE_PATH + '/adversarial_domain_transfer.pt')
+model = torch.load(SAVE_PATH + '/adversarial_domain_transfer_cnn.pt')
 if use_gpu:
     print "found CUDA GPU..."
     model = model.cuda()
@@ -629,7 +629,7 @@ for batch in tqdm(test_data_loader_neg):
 
     y_true.extend(np.zeros(batch_size)) #true label (not similar)
     y_pred_cnn.extend(score_neg_numpy.tolist())
-    auc_meter.add(score_neg_numpy, np.ones(batch_size))
+    auc_meter.add(score_neg_numpy, np.zeros(batch_size))
 #end for        
 
 roc_auc = roc_auc_score(y_true, y_pred_cnn)
