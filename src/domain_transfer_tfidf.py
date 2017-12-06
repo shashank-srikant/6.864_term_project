@@ -57,7 +57,7 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 print "fitting tf-idf vectorizer on source data..."
 tic = time()
-tfidf = TfidfVectorizer(tokenizer=tokenizer.tokenize, analyzer='word', ngram_range=(1,1))
+tfidf = TfidfVectorizer(tokenizer=tokenizer.tokenize, analyzer='word', ngram_range=(1,1), max_df=0.8, min_df=2, stop_words='english')
 tfidf.fit(source_text_df['title'].tolist() + source_text_df['body'].tolist())
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)

@@ -17,6 +17,7 @@ embeddings_path = <PATH TO EMBEDDINGS FILE ON YOUR LOCAL MACHINE>
 input_rawtext_filename = <SOME_FILENAME> #provide with extension
 extracted_data_file_name = data_raw.dat
 train_test_file_name = data_train_test.dat
+data_path_target = <PATH TO TARGET DATA>
 
 [data_params]
 MAX_TITLE_LEN = 10

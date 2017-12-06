@@ -29,11 +29,11 @@ from meter import AUCMeter
 np.random.seed(0)
 torch.manual_seed(0)
 
-#DATA_PATH_SOURCE = '../data/askubuntu/'
-#DATA_PATH_TARGET = '../data/android/'
+DATA_PATH_SOURCE = '../data/askubuntu/'
+DATA_PATH_TARGET = '../data/android/'
 
-DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
-DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
+#DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
+#DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
 
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
@@ -193,7 +193,7 @@ def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
 #load data
 print "loading source data..."
 tic = time()
-source_text_file = DATA_PATH_SOURCE + '/text_tokenized.txt'
+source_text_file = DATA_PATH_SOURCE + '/texts_raw_fixed.txt'
 source_text_df = pd.read_table(source_text_file, sep='\t', header=None)
 source_text_df.columns = ['id', 'title', 'body']
 source_text_df = source_text_df.dropna()
@@ -214,7 +214,7 @@ print "elapsed time: %.2f sec" %(toc - tic)
 #load data
 print "loading target data..."
 tic = time()
-target_text_file = DATA_PATH_TARGET + '/corpus.tsv'
+target_text_file = DATA_PATH_TARGET + '/corpus.txt'
 target_text_df = pd.read_table(target_text_file, sep='\t', header=None)
 target_text_df.columns = ['id', 'title', 'body']
 target_text_df = target_text_df.dropna()
@@ -277,8 +277,8 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 print "instantiating question encoder CNN model..."
 #training parameters
-num_epochs =  8 #2
-batch_size = 32 #8
+num_epochs =  8 
+batch_size = 32 
 
 #CNN parameters
 kernel_num = 200
