@@ -170,7 +170,7 @@ class  CNN(nn.Module):
 batch_size = 32
 embed_num = len(word_to_idx)
 embed_dim = len(embeddings[0])
-kernel_num = 100  
+kernel_num = 200  
 kernel_sizes = range(2,6)
 model = CNN(embed_num, embed_dim, kernel_num, kernel_sizes)
 
