@@ -25,20 +25,21 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 np.random.seed(0)
 
-DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
-DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
-
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
 
 config = ConfigParser.ConfigParser()
 config.readfp(open(r'config.ini'))
+
+DATA_PATH_TARGET = config.get('paths', 'data_path_target')
+
 SAVE_PATH = config.get('paths', 'save_path')
 RNN_SAVE_NAME = config.get('rnn_params', 'save_name')
 CNN_SAVE_NAME = config.get('cnn_params', 'save_name')
 EMBEDDINGS_FILE = config.get('paths', 'embeddings_path')
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
+TARGET_POS_NEG_FILE_NAME = config.get('paths', 'TARGET_POS_NEG_FILE_NAME')
 #TODO: do we keep the same title and body len for android dataset?
 
 def get_embeddings():
@@ -109,7 +110,7 @@ def generate_data(data_frame, train_text_df, word_to_idx, tokenizer):
 #load data
 print "loading data..."
 tic = time()
-target_text_file = DATA_PATH_TARGET + '/corpus.tsv'
+target_text_file = DATA_PATH_TARGET + '/corpus.txt'
 target_text_df = pd.read_table(target_text_file, sep='\t', header=None)
 target_text_df.columns = ['id', 'title', 'body']
 target_text_df = target_text_df.dropna()
@@ -142,6 +143,12 @@ target_pos_data = generate_data(target_pos_df, target_text_df, word_to_idx, toke
 target_neg_data = generate_data(target_neg_df, target_text_df, word_to_idx, tokenizer)
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
+
+filename = SAVE_PATH + TARGET_POS_NEG_FILE_NAME
+with open(filename, 'w') as f:
+    pickle.dump([target_pos_data, target_neg_data], f)
+
+sys.exit(0)
 
 print "loading CNN model pre-trained on source dataset..."
 #CNN architecture
