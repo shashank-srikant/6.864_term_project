@@ -49,13 +49,13 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 #training parameters
 num_epochs = 16
-batch_size = 32
+batch_size = 48
 
 #model parameters
 embed_num = len(word_to_idx)
 embed_dim = len(embeddings[0])
-kernel_num = 300  #TODO: tune
-kernel_sizes = range(2,6)
+kernel_num = 250  #TODO: tune
+kernel_sizes = range(1,6)
 learning_rate = 1e-3 
 weight_decay = 1e-5
 
@@ -91,7 +91,7 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-criterion = nn.MultiMarginLoss(p=1, margin=0.5, size_average=True)
+criterion = nn.MultiMarginLoss(p=1, margin=0.35, size_average=True)
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 optimizer = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
