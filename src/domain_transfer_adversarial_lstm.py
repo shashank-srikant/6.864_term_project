@@ -26,6 +26,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.metrics.pairwise import cosine_similarity
 
 np.random.seed(0)
+torch.manual_seed(0)
 
 DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
 DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
@@ -39,7 +40,7 @@ config.readfp(open(r'config.ini'))
 SAVE_PATH = config.get('paths', 'save_path')
 RNN_SAVE_NAME = config.get('rnn_params', 'save_name')
 CNN_SAVE_NAME = config.get('cnn_params', 'save_name')
-EMBEDDINGS_FILE = config.get('paths', 'embeddings_path')
+EMBEDDINGS_FILE = config.get('paths', 'glove_path')
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
 TRAIN_SAMPLE_SIZE = int(config.get('data_params', 'TRAIN_SAMPLE_SIZE'))
@@ -150,8 +151,7 @@ def generate_train_data(data_frame, train_text_df, word_to_idx, tokenizer, num_s
 def generate_test_data(data_frame, train_text_df, word_to_idx, tokenizer):
 
     target_dataset = []
-    #for idx in tqdm(range(data_frame.shape[0])):
-    for idx in tqdm(range(1000)):
+    for idx in tqdm(range(data_frame.shape[0])):
         q1_id = data_frame.loc[idx, 'id_1']
         q2_id = data_frame.loc[idx, 'id_2']
 
@@ -275,7 +275,7 @@ num_epochs = 16
 batch_size = 32 
 
 #RNN parameters
-embed_dim = embeddings.shape[1] #200
+embed_dim = embeddings.shape[1] #300
 hidden_size = 128 #hidden vector dim 
 weight_decay = 1e-5 
 learning_rate = 1e-3 
@@ -289,7 +289,7 @@ class RNN(nn.Module):
 
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim) 
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
-        self.embedding_layer.weight.requires_grad = True  #NOTE: make trainable
+        self.embedding_layer.weight.requires_grad = False 
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers=1, 
                             bidirectional=False, batch_first=True)
         self.hidden = self.init_hidden()
@@ -358,12 +358,16 @@ if use_gpu:
     class_weights_tensor = class_weights_tensor.cuda()
 print "class weights: ", class_weights
 
-model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+lstm_parameters = filter(lambda p: p.requires_grad, model.parameters())
+dclf_parameters = filter(lambda p: p.requires_grad, domain_clf.parameters())
+lstm_num_params = sum([np.prod(p.size()) for p in lstm_parameters])
+dclf_num_params = sum([np.prod(p.size()) for p in dclf_parameters])
+print "number of trainable params: ", lstm_num_params + dclf_num_params
 
-criterion_gen = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True) #margin=0.3
+criterion_gen = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True) 
 criterion_dis = nn.NLLLoss(weight=class_weights_tensor, size_average=True)
-optimizer_gen = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
-optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
+optimizer_gen = torch.optim.Adam(lstm_parameters, lr=learning_rate, weight_decay=weight_decay)
+optimizer_dis = torch.optim.Adam(dclf_parameters, lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
 scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 
@@ -512,7 +516,7 @@ for epoch in range(num_epochs):
         if use_gpu:
             lambda_k = lambda_k.cuda()
 
-        loss_tot = loss_gen - 1e-4 * loss_dis  #NOTE: keep lambda_k=1e-4 fixed
+        loss_tot = loss_gen - 1e-7 * loss_dis  #NOTE: keep lambda_k fixed
 
         loss_tot.backward()   #call backward() once
         optimizer_gen.step()  #min loss_tot: min loss_gen, max loss_dis
@@ -546,7 +550,7 @@ for epoch in range(num_epochs):
     training_loss_dis.append(running_train_loss_dis)
     print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss_tot)
     
-    torch.save(model, SAVE_PATH + '/adversarial_domain_transfer.pt')
+    torch.save(model, SAVE_PATH + '/adversarial_domain_transfer_lstm.pt')
 #end for
 """
 print "loading pre-trained model..."
