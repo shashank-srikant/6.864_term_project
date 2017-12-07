@@ -301,7 +301,7 @@ class  CNN(nn.Module):
         Ks = kernel_sizes #height of each filter
 
         self.embed = nn.Embedding(V, D)
-        #self.embed.weight.requires_grad = False
+        self.embed.weight.requires_grad = False
         self.embed.weight.data = torch.from_numpy(embeddings)
         self.convs1 = nn.ModuleList([nn.Conv2d(Ci, Co, (K, D)) for K in Ks])
 
