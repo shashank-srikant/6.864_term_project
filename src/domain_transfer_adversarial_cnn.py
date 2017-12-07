@@ -44,7 +44,7 @@ config.readfp(open(r'../src/config.ini'))
 SAVE_PATH = config.get('paths', 'save_path')
 RNN_SAVE_NAME = config.get('rnn_params', 'save_name')
 CNN_SAVE_NAME = config.get('cnn_params', 'save_name')
-EMBEDDINGS_FILE = config.get('paths', 'embeddings_path')
+EMBEDDINGS_FILE = config.get('paths', 'glove_path')
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
 TRAIN_SAMPLE_SIZE = int(config.get('data_params', 'TRAIN_SAMPLE_SIZE'))
@@ -279,7 +279,7 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 print "instantiating question encoder CNN model..."
 #training parameters
-num_epochs =  8 
+num_epochs = 16 
 batch_size = 32 
 
 #CNN parameters
@@ -288,7 +288,7 @@ kernel_sizes = range(2,6)
 weight_decay = 1e-5 
 learning_rate = 1e-3 
 embed_num = len(word_to_idx)
-embed_dim = embeddings.shape[1] #200
+embed_dim = embeddings.shape[1] #300
 
 #CNN architecture
 class  CNN(nn.Module):
@@ -301,7 +301,7 @@ class  CNN(nn.Module):
         Ks = kernel_sizes #height of each filter
 
         self.embed = nn.Embedding(V, D)
-        #self.embed.weight.requires_grad = False
+        self.embed.weight.requires_grad = False
         self.embed.weight.data = torch.from_numpy(embeddings)
         self.convs1 = nn.ModuleList([nn.Conv2d(Ci, Co, (K, D)) for K in Ks])
 
@@ -365,13 +365,17 @@ if use_gpu:
     class_weights_tensor = class_weights_tensor.cuda()
 print "class weights: ", class_weights
 
-model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+cnn_parameters = filter(lambda p: p.requires_grad, model.parameters())
+clf_parameters = filter(lambda p: p.requires_grad, domain_clf.parameters())
+cnn_num_params = sum([np.prod(p.size()) for p in cnn_parameters])
+clf_num_params = sum([np.prod(p.size()) for p in clf_parameters])
+print "number of trainable params: ", cnn_num_params + clf_num_params
 
 criterion_gen = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True) 
 criterion_dis = nn.NLLLoss(weight=class_weights_tensor, size_average=True)
 
-optimizer_gen = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
-optimizer_dis = torch.optim.Adam(domain_clf.parameters(), lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
+optimizer_gen = torch.optim.Adam(cnn_parameters, lr=learning_rate, weight_decay=weight_decay)
+optimizer_dis = torch.optim.Adam(clf_parameters, lr= -1 * learning_rate, weight_decay=weight_decay) #NOTE: negative learning rate for adversarial training
 
 scheduler_gen = StepLR(optimizer_gen, step_size=4, gamma=0.5) #half learning rate every 4 epochs
 scheduler_dis = StepLR(optimizer_dis, step_size=4, gamma=0.5) #half learning rate every 4 epochs
@@ -498,7 +502,7 @@ for epoch in range(num_epochs):
         if use_gpu:
             lambda_k = lambda_k.cuda()
 
-        loss_tot = loss_gen - 1e-3 * loss_dis  #NOTE: keep lambda_k=1e-4 fixed
+        loss_tot = loss_gen - 1e-6 * loss_dis  #NOTE: keep lambda_k fixed
 
         loss_tot.backward()   #call backward() once
         optimizer_gen.step()  #min loss_tot: min loss_gen, max loss_dis
