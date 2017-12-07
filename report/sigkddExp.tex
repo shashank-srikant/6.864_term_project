@@ -77,9 +77,11 @@ Content on the internet grows at an exponential rate. Given this growth, finding
 \section{Introduction}
 The problem of text similarity, and specifically, similarity of short queries or answers found on the internet, have been central to the modern NLP community. With the explosion in content on the internet, a lack of robust tools to find similar content has the risk of creating further similar and redundant content, which only exacerbates the original problem.
 
-Another relevant and pressing concern which such an explosion and variety of content has introduced is the increased cost of building predictive NLP, NLU models which cater to such content. The variety in content requires building a model from scratch, in spite of how closely related the content may be. For instance, 
+Another relevant and pressing concern which such an explosion and variety of content has introduced is the increased cost of building predictive NLP, NLU models which cater to such content. The variety in content requires building a model from scratch, irrespective of how closely related the content may have been to a previously built model. For instance, if we were to model the reviews written for movies, we would have to reinvest effort and time in modeling reviews written for another domain, say, food or hotels. In spite of there being conceptual, semantic similarities between the tasks of reviewing movies and reviewing food, models would have to be created anew. And each such modeling exercise demands a large repository of curated, preferably labeled data, which at times is simply unfeasible. The pressing challenge such a variety of content has created is to be able to learn with minimal supervision, and from loosely related datasets.
 
-With recent advances in neural architectures for NLP\-applications, it is relevant to investigate how they perform on such tasks. Traditionally, text similarity has been approached with standard information retrieval techniques, like Lucene and REF, which consider XYZ. It is relevant to investigate how more recent techniques like LSTMs and CNNs, which have shown to successfully model text on tasks like XYZ, model this particular task. 
+In this work, we investigate two problems - one, to model question-similarity tasks using state of the art techniques in neural modeling and two, transfer those models to a loosely related, yet equally rich domain under the constraint of having no supervised information on that new domain. Specifically, we explore 
+
+With recent advances in neural architectures for NLP applications, it is relevant to investigate how they perform on the task of question similarity. Traditionally, text similarity has been approached with standard information retrieval techniques, like Lucene and REF, which consider XYZ. It is relevant to investigate how more recent techniques like LSTMs and CNNs, which have shown to successfully model text on tasks like XYZ, model this particular task. 
 
 In comparison to this, it is interesting to investigate whether using neural approaches, one can outperform them while not having to invest in engineering the right features to get to such a performance. In addition to 
 
@@ -146,7 +148,7 @@ The details of the construction of the \texttt{.bib} file
 are beyond the scope of this sample document, but more
 information can be found in the \textit{Author's Guide},
 and exhaustive details in the \textit{\LaTeX\ User's
-Guide}\cite{Lamport:LaTeX}.
+Guide}\cite{singh2016question}.
 
 So far, this article has shown only the plainest form
 of the citation command, using \texttt{{\char'134}cite}.
