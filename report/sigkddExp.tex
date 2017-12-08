@@ -390,6 +390,7 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
 \section{Other techniques for DA}
 \label{other_techniques}
 We explored two other techniques to carry out unsupervised domain transfer. We tried out Doc2Vec \cite{doc2vec1} and Siamese recurrent networks \cite{siamese} for domain transfer. We describe each briefly here:
+
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
 \item \textbf{Doc2Vec} Paragraph vectors, or $\mathsf{doc2vec}$, were proposed by Le and Mikolov (2014) as a simple extension to word2vec to extend the learning of embeddings from words to word sequences. $\mathsf{doc2vec}$ is agnostic to the  granularity of the word sequence — it can equally be a word n-gram, sentence, paragraph or document. In this paper, we use the term ``document embedding'' to refer to the embedding of a word sequence, irrespective of its granularity.
 
@@ -399,6 +400,21 @@ We explored two other techniques to carry out unsupervised domain transfer. We t
 
 \section{Experiments}
 \label{experiments}
+We pose the following research questions, whose answers we investigate in this work
+\begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
+\item \textbf{E1:} How well do deep neural encoders solve the task of in-domain question retrieval. How does it compare to baselines and the state of the art? What are the limitations.
+\item \textbf{E2:} How effective are deep adversarial neural methods in adapting from one domain to another to learn a common task. How does it compare to the baselines and state of the art? What are the limitations?
+\item \textbf{E3:} How effective is $\mathsf{doc2vec}$ in adapting knowledge from one domain to another.
+\item \textbf{E4:} How effective are siamese networks in adapting knowledge from one domain to another.
+\end{itemize}
+
+\subsection{Experiment 1}
+To answer $E1$, we measure the performance of our neural encoders against of $\mathsf{BM25 scores}$ provided for the test set of the corpus. The metrics we compare on 
+\subsection{Experiment 2}
+\subsection{Experiment 3}
+\subsection{Experiment 4}
+
+\section{Results}
 
 \section{Discussion}
 \label{discussion}
@@ -406,12 +422,7 @@ We explored two other techniques to carry out unsupervised domain transfer. We t
 %ACKNOWLEDGEMENTS are optional
 \section{Acknowledgements}
 \label{ack}
-This section is optional; it is a location for you
-to acknowledge grants, funding, editing assistance and
-what have you.  In the present case, for example, the
-authors would like to thank Gerald Murray of ACM for
-his help in codifying this \textit{Author's Guide}
-and the \textbf{.cls} and \textbf{.tex} files that it describes.
+The authors thank the course staff of 6.864, Fall 2017, MIT. This was a fun project!
 
 %
 % The following two commands are all you need in the
