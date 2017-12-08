@@ -178,7 +178,7 @@ for epoch in range(num_epochs):
     learning_rate_schedule.append(scheduler.get_lr())
     print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
     
-    torch.save(model, SAVE_PATH + SAVE_NAME)
+    #torch.save(model, SAVE_PATH + SAVE_NAME)
 
     #early stopping
     patience = 4
