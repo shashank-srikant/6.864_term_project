@@ -19,6 +19,7 @@
 \usepackage{booktabs} 
 \usepackage{multirow, array}
 \usepackage{makecell}
+\usepackage[table,x11names]{xcolor}
 
 \begin{document}
 
@@ -91,14 +92,18 @@ Content on the internet grows at an exponential rate. Given this growth, finding
 & Source and target domains are exactly the same
 & Learn models on training set and test on future unseen data \\
 \cmidrule{1-5}
-  \multirow{2}{\linewidth}{\makecell{$\mathcal{D}_S \neq \mathcal{D}_T,$\\$ T_S = T_T$}}
+ \multirow{2}{\linewidth}{\textbf{\makecell{$\mathcal{D}_S \neq \mathcal{D}_T$,\\ $T_S = T_T$}}} 
 & \multirow{2}{\linewidth}{Transductive Transfer Learning}
 & \multirow{2}{\linewidth}{Labelled data in source domain(s) and unlabeled data from $\mathcal{P}(X_S) \neq \mathcal{P}(X_T$)}
 & Single source domain adaptation
+\cellcolor{blue!25}
 & Learning common shared representation; instance weighing, parameter transfer
 \\
 \cmidrule{4-5}
- & & & Multi-source adaptation
+ 
+&
+&
+& Multi-source adaptation
 & Classifier combination; efficient combination of information from multiple sources; Feature representation \\
 \cmidrule{1-5} 
 
@@ -115,13 +120,14 @@ but $T_S \neq T_T$ }
 & Simultaneously learns multiple tasks within (or across) domain(s) by exploiting the common feature subspace shared across the tasks \\
 \cmidrule{1-5}
 \makecell{$\mathcal{D}_S\neq \mathcal{D}_T$\\$T_S \neq T_T$}
-& Kim et al. (2015)
+& Kim et al., 2015 \cite{kim2015new}
 & Labeled data in source and target domains
 & Transfer learning with disparate label set
 & Disparate fine grained label sets across domains, however, same coarse grained labels set can be invoked across domains
 \\
 \bottomrule
 \end{tabular*}
+\caption {A brief summary of different transfer learning approaches. The cell marked in blue highlights the approach explored in this work. This summary is based on the work detailed in the survey paper by Pan et. al.\protect\cite{pan2010survey}}
 \label{tab:related_work}
 \end{table*}
 
@@ -141,7 +147,11 @@ This work is organized into the following sections - Section \ref{related} discu
 
 \section{Related work}
 \label{related}
-Table \ref{tab:related_work} summarizes the work in this domain.
+Domain adaptation has been an active area of research in NLP. Table \ref{tab:related_work}  summarizes different settings of transfer learning \cite{pan2010survey}. Our work explores techniques in unsupervised domain adaptation, which operates when the source and target domains ($\mathcal{D}$) are different, but share a common task ($T_i$) to achieve. It helps understand where this approach lies in the spectrum of techniques. 
+
+We study in this work the scenario where the domains vary while the tasks remain the same is referred to as transductive transfer learning. This is the most extensively studied settings in the transfer learning literature and can be broadly categorized as single and multi-source adaptation. Single source adaptation\cite{chen2009extracting, ando2005framework, daume2009frustratingly} primarily aims at minimizing the divergence between the source and target domains either at instance or feature levels. The general idea being identifying a suitable low dimensional space where transformed source and target domains data follow similar distributions and hence, a standard supervised learning algorithm can be trained.
+
+Multiple methods perform unsupervised domain adaptation by matching the feature distributions in the source and the target domains. Some approaches perform this by reweighing or selecting samples from the source domain  \cite{borgwardt2006integrating, huang2007correcting, gong2012geodesic}, while others seek an explicit feature space transformation that would map source distribution into the target ones \cite{pan2011domain, gopalan2011domain, baktashmotlagh2013unsupervised}. An important  aspect of the distribution matching approach is the way the (dis)similarity between distributions is measured. Here, one popular choice is matching the distribution means in the kernel-reproducing Hilbert space \cite{borgwardt2006integrating, huang2007correcting}, whereas \cite{gong2012geodesic, fernando2013unsupervised} map the principal axes associated with each of the distributions. The approach explored in this work is based on \cite{ganin2015unsupervised} and also attempts to match feature space distributions, however this is accomplished by modifying the feature representation itself rather than by reweighing or geometric transformation. Also, the method used to measure the disparity between distributions based on their separability is implicitly different and is done by a deep discriminatively-trained classifier.
 
 \section{In-domain Question similarity}
 \label{in_domain}
