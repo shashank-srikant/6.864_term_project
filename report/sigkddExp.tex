@@ -214,7 +214,7 @@ We describe here the dataset that we base our work on.
 \item The \textit{Ask Ubuntu} platform has a section where users flag similar questions. We use that as a weak signal to inform our true labels, since these user-flagged suggestions are not complete and suffer from high recall issues.
 \item In order to train our classifiers with dissimilar pairs of questions, each query is also associated with randomly drawn queries from the sample.
 \item We trained on roughly 110,000 query-answer pairs to train our in-domain classifier.
-\item In the test set, for each pair of similar and dissimilar questions, we are also given the $\mathsf{BM25}$ scores, their similarity as measured by an industrial IR-system. These serve as a baseline for all our experiments.
+\item In the test set, for each pair of similar and dissimilar questions, we are also given the $\mathsf{BM25 scores}$, their similarity as measured by an industrial IR-system. These serve as a baseline for all our experiments.
 \end{itemize}
 
 \subsection{Model}
@@ -296,42 +296,80 @@ We use neural adversarial techniques\cite{ganin2015unsupervised} to adapt to a d
 
 
 \subsection{Dataset}
-We worked with two datasets, one as our $\mathsf{source}$ domain, wherein we had labeled data and another as our $\mathsf{target}$ domain, where we had no labeled data. The task on both these datasets was the same - to predict similarity between questions. The $\mathsf{source}$ domain in our experiments was the \textit{Ask Ubuntu} dataset, described in the previous section. The $\mathsf{target}$ domain that we wanted to transfer this model to was the \textit{Android stack exchange}, a question-answer site on Android-related issues. Table \ref{tab:dataset} describes the summary statistics of this dataset. For the $\mathsf{target}$ domain, we had XX sentences to test. Each query was expert-annotated with similar and dissimilar queries they corresponded to. No $\mathsf{BM25} scores$ were provided to evaluate a baseline. Table XX describes the architecture of the encoders and decoders.
+We worked with two datasets, one as our $\mathsf{source}$ domain, wherein we had labeled data and another as our $\mathsf{target}$ domain, where we had no labeled data. The task on both these datasets was the same - to predict similarity between questions. The $\mathsf{source}$ domain in our experiments was the \textit{Ask Ubuntu} dataset, described in the previous section. The $\mathsf{target}$ domain that we wanted to transfer this model to was the \textit{Android stack exchange}, a question-answer site on Android-related issues. Table \ref{tab:dataset} describes the summary statistics of this dataset. For the $\mathsf{target}$ domain, we had XX sentences to test. Each query was expert-annotated with similar and dissimilar queries they corresponded to. No $\mathsf{BM25 scores}$ were provided to evaluate a baseline. Table XX describes the architecture of the encoders and decoders.
 
-\begin{table}[h]
-\begin{tabular}{l|r|l|r}
-      \multicolumn{2}{c|}{CNN}
-     & \multicolumn{2}{c}{LSTM}
-     \\
-     \toprule
-     Parameter
-     & Value
-     & Parameter
-     & Value
-     \\
-     \# of sentences
-     & 40
-     & \# of sentences
-     & 50
-     \\
-     \# of stop words 
-     & 50
-     & \# of sentences
-     & 90
-     \\
-     mean word length - title
-     & 299
-     & \# of sentences
-     & 300
-     \\
-     mean word length - body
-     & 299
-     & \# of sentences
-     & 300
-\end{tabular}
-\caption{Parameters of the encoder and domain differentiator networks for domain adaptation}
-\label{tab:indomain}
-\end{table}
+\begin{table*}[h]
+\parbox{.55\linewidth}{
+    
+    \begin{tabular}{l|r|l|r}
+          \multicolumn{2}{c|}{CNN}
+         & \multicolumn{2}{c}{LSTM}
+         \\
+         \toprule
+         Parameter
+         & Value
+         & Parameter
+         & Value
+         \\
+         \# of sentences
+         & 40
+         & \# of sentences
+         & 50
+         \\
+         \# of stop words 
+         & 50
+         & \# of sentences
+         & 90
+         \\
+         mean word length - title
+         & 299
+         & \# of sentences
+         & 300
+         \\
+         mean word length - body
+         & 299
+         & \# of sentences
+         & 300
+    \end{tabular}
+    \caption{Parameters of the encoder and domain differentiator\protect\\ networks for domain adaptation}
+    \label{tab:indomain}
+}
+\parbox{.5\linewidth}{
+    
+    \begin{tabular}{l|r|l|r}
+          \multicolumn{2}{c|}{Siamese}
+         & \multicolumn{2}{c}{$\mathsf{doc2vec}$}
+         \\
+         \toprule
+         Parameter
+         & Value
+         & Parameter
+         & Value
+         \\
+         \# of sentences
+         & 40
+         & \# of sentences
+         & 50
+         \\
+         \# of stop words 
+         & 50
+         & \# of sentences
+         & 90
+         \\
+         mean word length - title
+         & 299
+         & \# of sentences
+         & 300
+         \\
+         mean word length - body
+         & 299
+         & \# of sentences
+         & 300
+    \end{tabular}
+    \caption{Parameters of $\mathsf{doc2vec}$ and the siamese network architectures}
+    \label{tab:indomain}
+}
+\end{table*}
 
 \subsection{Model}
 We model this task of unsupervised domain adaptation using a neural adversarial approach \cite{ganin2015unsupervised}. The core idea is as follows - 
@@ -351,6 +389,13 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
     
 \section{Other techniques for DA}
 \label{other_techniques}
+We explored two other techniques to carry out unsupervised domain transfer. We tried out Doc2Vec \cite{doc2vec1} and Siamese recurrent networks \cite{siamese} for domain transfer. We describe each briefly here:
+\begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
+\item \textbf{Doc2Vec} Paragraph vectors, or $\mathsf{doc2vec}$, were proposed by Le and Mikolov (2014) as a simple extension to word2vec to extend the learning of embeddings from words to word sequences. $\mathsf{doc2vec}$ is agnostic to the  granularity of the word sequence — it can equally be a word n-gram, sentence, paragraph or document. In this paper, we use the term ``document embedding'' to refer to the embedding of a word sequence, irrespective of its granularity.
+
+\item \textbf{Siamese networks} 
+
+\end{itemize}
 
 \section{Experiments}
 \label{experiments}
