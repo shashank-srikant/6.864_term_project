@@ -13,10 +13,15 @@
 % Questions/suggestions regarding the guidelines, .tex and .cls files, etc. to
 % Gerald Murray ---> murray@acm.org
 %
-
+ 
 \documentclass{sigkddExp}
 
+\usepackage{booktabs} 
+\usepackage{multirow, array}
+\usepackage{makecell}
+
 \begin{document}
+
 %
 % --- Author Metadata here ---
 % -- Can be completely blank or contain 'commented' information like this...
@@ -74,12 +79,58 @@
 Content on the internet grows at an exponential rate. Given this growth, finding relevant information accurately becomes a critical task for the NLP community to address. More so, with this rapid growth, curating labeled datasets to build models for the wide variety of content available on the internet has become extremely time and resource intensive. In this work, we explore whether neural models are able to successfully model content similarity and retrieval tasks, and whether they can transfer knowledge from one domain, where supervised labels are available, to a domain with no available labels. Specifically, we explore content similarity in online discussion forums, where we explore the following questions - a. how effectively can neural approaches model question-answer retrieval tasks, which is, given a question and answer pair present on an online discussion forum, how effectively can neural approaches find similar pairs on that forum. b. Given a model of question-answer similarity in one online discussion forum, how effective are neural approaches in transferring that knowledge to a new, loosely related domain. In this work, we explore a baseline approach of modeling question similarity tasks on the popular online community  \textit{AskUbuntu}. We show how neural architectures like LSTMs and CNNs outperform traditional approaches in information retrieval. Additionally, and importantly, we explore the problem of transferring these models to detect question-answer similarity on \textit{Android stack exchange},  a similar yet different online discussion community which discusses Android related problems. We show how neural domain adaptation techniques successfully beat baseline IR techniques and direct neural transfer techniques. We also discuss some limitations and challenges in using such architectures.
 \end{abstract}
 
+\begin{table*}[th]
+\begin{tabular*}{\linewidth}{m{0.13\linewidth}m{0.12\linewidth}m{0.18\linewidth}m{0.18\linewidth}m{0.28\linewidth}}
+\toprule
+\toprule
+\textbf{Scenario} & \textbf{Setting} & \textbf{Nature of Data} & \textbf{Learning Paradigm} & \textbf{Main Concepts}  \\
+\toprule 
+ \makecell{$\mathcal{D}_S = \mathcal{D}_T,$\\$ T_S = T_T$}
+& Traditional Machine learning
+& Labelled data in source domain(s) and unlabeled data in target domain
+& Source and target domains are exactly the same
+& Learn models on training set and test on future unseen data \\
+\cmidrule{1-5}
+  \multirow{2}{\linewidth}{\makecell{$\mathcal{D}_S \neq \mathcal{D}_T,$\\$ T_S = T_T$}}
+& \multirow{2}{\linewidth}{Transductive Transfer Learning}
+& \multirow{2}{\linewidth}{Labelled data in source domain(s) and unlabeled data from $\mathcal{P}(X_S) \neq \mathcal{P}(X_T$)}
+& Single source domain adaptation
+& Learning common shared representation; instance weighing, parameter transfer
+\\
+\cmidrule{4-5}
+ & & & Multi-source adaptation
+& Classifier combination; efficient combination of information from multiple sources; Feature representation \\
+\cmidrule{1-5} 
+
+\multirow{2}{\linewidth}{No conditions on $\mathcal{D}_S$, $\mathcal{D}_T$, 
+but $T_S \neq T_T$ }
+& \multirow{2}{\linewidth}{Inductive Transfer Learning}
+& Unlabeled data in source domain(s) and labeled data in target domain
+& Self-taught learning
+& Extracts higher level representations from unlabeled auxiliary data to learn instance-to-label mapping with labeled target instances
+\\
+\cmidrule{3-5} 
+& & Labeled data is available in all domains
+& Multi-task learning
+& Simultaneously learns multiple tasks within (or across) domain(s) by exploiting the common feature subspace shared across the tasks \\
+\cmidrule{1-5}
+\makecell{$\mathcal{D}_S\neq \mathcal{D}_T$\\$T_S \neq T_T$}
+& Kim et al. (2015)
+& Labeled data in source and target domains
+& Transfer learning with disparate label set
+& Disparate fine grained label sets across domains, however, same coarse grained labels set can be invoked across domains
+\\
+\bottomrule
+\end{tabular*}
+\label{tab:related_work}
+\end{table*}
+
 \section{Introduction}
 The problem of text similarity, and specifically, similarity of short queries or answers found on the internet, have been central to the modern NLP community. With the explosion in content on the internet, a lack of robust tools to find similar content has the risk of creating further similar and redundant content, which only exacerbates the original problem.
 
 Another relevant and pressing concern which such an explosion and variety of content has introduced is the increased cost of building predictive NLP, NLU models which cater to such content. The variety in content requires building a model from scratch, irrespective of how closely related the content may have been to a previously built model. For instance, if we were to model the reviews written for movies, we would have to reinvest effort and time in modeling reviews written for another domain, say, food or hotels. In spite there being conceptual, semantic similarities between the tasks of reviewing movies and reviewing food, models have to be created anew. And each such modeling exercise demands a large repository of curated, preferably labeled data, which most often is not feasible to put together. The pressing challenge such a variety of content has created is to be able to learn with minimal supervision, and from loosely related datasets.
 
-In this work, we investigate two problems - one, to model question-similarity tasks using state of the art techniques in neural modeling and two, transfer those models to a loosely related, yet equally rich domain under the constraint of having no supervised information on that new domain. Specifically, we explore the problem of finding similar question-answer pairs on the popular online discussion \textit{AskUbuntu.org}. This discussion forum focuses on troubleshooting queries on Ubuntu, the popular open-source operating system. In addition to  learning models to find relevant question-answer pairs on this forum, we also use this domain to transfer knowledge onto modeling question-answer similarity in \textit{Android stack exchange}. This is an online community, similar in setup and structure to \textit{AskUbuntu}, wherein short queries and corresponding answers on Android-related troubleshooting are present.
+In this work, we investigate two problems - one, to model question-similarity tasks using state of the art techniques in neural modeling and two, transfer those models to a loosely related, yet equally rich domain under the constraint of having no supervised information on that new domain. Specifically, we explore the problem of finding similar question-answer pairs on the popular online discussion \textit{AskUbuntu}\footnote{https://askubuntu.com}. This discussion forum focuses on troubleshooting queries on Ubuntu, the popular open-source operating system. In addition to  learning models to find relevant question-answer pairs on this forum, we also use this domain to transfer knowledge onto modeling question-answer similarity in \textit{Android stack exchange}\footnote{https://android.stackexchange.com}. This is an online community, similar in setup and structure to \textit{AskUbuntu}, wherein short queries and corresponding answers on Android-related troubleshooting are present.
 
 In this work, we investigate how state of the art neural architectures for NLP applications perform on the task of question similarity. Traditionally, text similarity tasks were solved using information retrieval techniques like building an indexer and applying ABC and ABC, which consider XYZ. We study how more recent techniques like RNNs and CNNs, which have shown to successfully model text on tasks like XYZ, model this particular task. For the domain adaptation task of learning question similarity in {Android stack exchange}, we explore adversarial neural techniques, and Doc2Vec \cite{REF} in learning from the \textit{Ask Ubuntu} dataset. 
 
@@ -87,30 +138,10 @@ The study demonstrates the relevance of neural techniques in a critical NLP task
 
 This work is organized into the following sections - Section \ref{related} discusses related work in this field. Sections \ref{in_domain}, \ref{domain_adapt},  \ref{other_techniques} discuss the various techniques to model in-domain and domain adaptation tasks for the given problem. Section \ref{experiments} discusses the experiment setup and the results. Section \ref{discussion} discusses the results and concludes our work.
 
+
 \section{Related work}
 \label{related}
-Typically, the body of a paper is organized
-into a hierarchical structure, with numbered or unnumbered
-headings for sections, subsections, sub-subsections, and even
-smaller sections.  The command \texttt{{\char'134}section} that
-precedes this paragraph is part of such a
-hierarchy.\footnote{This is the second footnote.  It
-starts a series of three footnotes that add nothing
-informational, but just give an idea of how footnotes work
-and look. It is a wordy one, just so you see
-how a longish one plays out.} \LaTeX\ handles the numbering
-and placement of these headings for you, when you use
-the appropriate heading commands around the titles
-of the headings.  If you want a sub-subsection or
-smaller part to be unnumbered in your output, simply append an
-asterisk to the command name.  Examples of both
-numbered and unnumbered headings will appear throughout the
-balance of this sample document.
-
-Because the entire article is contained in
-the \textbf{document} environment, you can indicate the
-start of a new paragraph with a blank line in your
-input file; that is why this sentence forms a separate paragraph.
+Table \ref{tab:related_work} summarizes the work in this domain.
 
 \section{In-domain Question similarity}
 \label{in_domain}
