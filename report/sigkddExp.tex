@@ -23,6 +23,7 @@
 \usepackage{color}
 \usepackage{enumitem}
 \usepackage{soul}
+\usepackage{tabularx}
 
 \begin{document}
 
@@ -141,7 +142,7 @@ Another relevant and pressing concern which such an explosion and variety of con
 
 In this work, we investigate two problems - one, to model question-similarity tasks using state of the art techniques in neural modeling and two, transfer those models to a loosely related, yet equally rich domain under the constraint of having no supervised information on that new domain. Specifically, we explore the problem of finding similar question-answer pairs on the popular \textit{Ask Ubuntu Stack Exchange}.\footnote{https://askubuntu.com} This discussion forum focuses on troubleshooting queries on Ubuntu, the popular open-source operating system. In addition to  learning models to find relevant question-answer pairs on this forum, we also use this domain to transfer knowledge onto modeling question-answer similarity in \textit{Android Stack Exchange}.\footnote{https://android.stackexchange.com} This is an online community, similar in setup and structure to \textit{Ask Ubuntu}, wherein short queries and corresponding answers on Android-related troubleshooting are present.
 
-In this work, we investigate how state of the art neural architectures for NLP applications perform on the task of question similarity. Traditionally, text similarity tasks were solved using information retrieval techniques like building an indexer and applying {\color{red}ABC and ABC, which consider XYZ}. We study how more recent techniques like RNNs and CNNs, which have shown to successfully model a variety of NLP tasks, solve the question retrieval problem. For the domain adaptation task, we explore adversarial training techniques \cite{ganin2015unsupervised, lei2015semi} as well as the performance on different architectures like $\textsf{Doc2Vec}$ \cite{doc2vec1} and Siamese neural networks \cite{siamese}.
+In this work, we investigate how state of the art neural architectures for NLP applications perform on the task of question similarity. Traditionally, text similarity tasks were solved using information retrieval techniques like building an indexer and applying string search over the indexed corpus. A lot of variations to this general strategy have been explored over the years. We study how more recent techniques like RNNs and CNNs, which have shown to successfully model a variety of NLP tasks, solve the question retrieval problem. For the domain adaptation task, we explore adversarial training techniques \cite{ganin2015unsupervised, lei2015semi} as well as the performance on different architectures like $\textsf{Doc2Vec}$ \cite{doc2vec1} and Siamese neural networks \cite{siamese}.
 
 This study demonstrates the relevance of neural techniques in a critical NLP task like question-answer retrieval. We demonstrate how using neural approaches, one can outperform traditional information retrieval techniques while not having to invest heavily in engineering the right features to get to such performance. Additionally, we show the successful transfer of domain knowledge from one domain to another using state of the art neural transfer techniques.
 
@@ -234,43 +235,6 @@ where $\delta(.,.)$ denotes a non-negative margin. We set $\delta(p, p^+_i)$ to 
   \item Similarity is evaluated on standard information retrieval metrics like \textit{Precision@1}, \textit{Precision@5}, \textit{Mean Average Precision}, and \textit{Mean Reciprocal Rank}. The inputs to each of these metrics is a ranked list of scores. We pass in the cosine similarity scores obtained between the query and each of the positive and negative questions associated with that query, as our ranked list. The $\mathsf{BM25 scores}$ for each of these pairs is used as a baseline similarity score and their evaluations on the metrics mentioned above are considered the baseline performance indicators for this approach.
 \end{itemize}
 
-
-\begin{table}[h]
-\begin{tabular}{l|r|l|r}
-      \multicolumn{2}{c|}{CNN}
-     & \multicolumn{2}{c}{LSTM}
-     \\
-     \toprule
-     \textbf{Parameter}
-     & \textbf{Value}
-     & \textbf{Parameter}
-     & \textbf{Value}
-     \\
-     output channels
-     & 250
-     & hidden size
-     & 128 $\times$ 2
-     \\
-     loss margin
-     & 0.4
-     & loss margin
-     & 0.4
-     \\
-     kernel size
-     & [1-5] $\times$ 300
-     & bidirectional
-     & true
-     \\
-     pooling
-     & average
-     & pooling
-     & avergae
-\end{tabular}
-\caption{Parameters of our encoder networks for in-domain classification}
-\label{tab:indomain}
-\end{table}
-
-
 \subsection{CNN}
 We describe the CNN architecture implemented in this work. We detail the inputs to the different layers of the network, which should help illustrate the architecture.
 We define a CNN with the following layers -
@@ -300,81 +264,7 @@ We define a CNN with the following layers -
 
 
 \subsection{Dataset}
-We worked with two datasets, one as our $\mathsf{source}$ domain, wherein we had labeled data and another as our $\mathsf{target}$ domain, where we had no labeled data. The task on both these datasets was the same - to predict similarity between questions. The $\mathsf{source}$ domain in our experiments was the \textit{AskUbuntu} dataset, described in the previous section. The $\mathsf{target}$ domain was the \textit{Android Stack Exchange}, a question-answering site on Android-related issues. Table \ref{tab:dataset} describes the summary statistics of this dataset. For the $\mathsf{target}$ domain, we had {\color{red} XX} sentences to test. Each query was expert-annotated with similar and dissimilar queries they corresponded to. A TF-IDF representation was used as a baseline for evaluating domain adaptation. Table {\color{red} XX} describes the architecture of the encoders and decoders.
-
-\begin{table*}[h]
-\parbox{.55\linewidth}{
-    
-    \begin{tabular}{l|r|l|r}
-          \multicolumn{2}{c|}{CNN}
-         & \multicolumn{2}{c}{LSTM}
-         \\
-         \toprule
-         Parameter
-         & Value
-         & Parameter
-         & Value
-         \\
-         \# of sentences
-         & 40
-         & \# of sentences
-         & 50
-         \\
-         \# of stop words 
-         & 50
-         & \# of sentences
-         & 90
-         \\
-         mean word length - title
-         & 299
-         & \# of sentences
-         & 300
-         \\
-         mean word length - body
-         & 299
-         & \# of sentences
-         & 300
-    \end{tabular}
-    \caption{Parameters of the encoder and domain differentiator\protect\\ networks for domain adaptation}
-    \label{tab:indomain}
-}
-\parbox{.5\linewidth}{
-    
-    \begin{tabular}{l|r|l|r}
-          \multicolumn{2}{c|}{Siamese}
-         & \multicolumn{2}{c}{$\mathsf{doc2vec}$}
-         \\
-         \toprule
-         Parameter
-         & Value
-         & Parameter
-         & Value
-         \\
-         \# of sentences
-         & 40
-         & \# of sentences
-         & 50
-         \\
-         \# of stop words 
-         & 50
-         & \# of sentences
-         & 90
-         \\
-         mean word length - title
-         & 299
-         & \# of sentences
-         & 300
-         \\
-         mean word length - body
-         & 299
-         & \# of sentences
-         & 300
-    \end{tabular}
-    \caption{Parameters of $\mathsf{doc2vec}$ and the siamese network architectures}
-    \label{tab:indomain}
-}
-\end{table*}
-
+We worked with two datasets, one as our $\mathsf{source}$ domain, wherein we had labeled data and another as our $\mathsf{target}$ domain, where we had no labeled data. The task on both these datasets was the same - to predict similarity between questions. The $\mathsf{source}$ domain in our experiments was the \textit{AskUbuntu} dataset, described in the previous section. The $\mathsf{target}$ domain was the \textit{Android Stack Exchange}, a question-answering site on Android-related issues. Table \ref{tab:dataset} describes the summary statistics of this dataset. For the $\mathsf{target}$ domain, we had {\color{red} XX} sentences to test. Each query was expert-annotated with similar and dissimilar queries they corresponded to. A TF-IDF representation was used as a baseline for evaluating domain adaptation.
 \subsection{Model}
 We model this task of unsupervised domain adaptation using a neural adversarial approach \cite{ganin2015unsupervised}. The core idea is as follows - 
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
@@ -391,7 +281,8 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
 \label{fig:adversary}
 \caption{Adversarial network for unsupervised domain adaptation investigated in this work. Image reference: Ganin et al., 2015 \protect\cite{ganin2015unsupervised}}
 \end{figure}
-    
+ 
+
 \section{Exploring Domain Adaptation}
 \label{other_techniques}
 We explored two other techniques to carry out unsupervised domain transfer - $\textsf{Doc2Vec}$ \cite{doc2vec1} and Siamese recurrent networks \cite{siamese}. We describe each briefly here:
@@ -404,33 +295,209 @@ We explored two other techniques to carry out unsupervised domain transfer - $\t
 
 \end{itemize}
 
-\section{Experiments and Results}
+%\begin{table*}[h]
+%\parbox{.3\linewidth}{
+%}
+%\caption{Parameters of our encoder networks for in-domain classification}
+%\label{tab:indomain}
+%\parbox{.3\linewidth}{
+    
+%}
+%\parbox{.3\linewidth}{
+%\begin{table}
+   
+%}
+%\end{table*}
 
+
+\section{Experiments and Results}
 \label{experiments}
 We pose the following research questions, whose answers we investigate in this work
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
 \item \textbf{E1:} How well do deep neural encoders solve the task of in-domain question retrieval. How does it compare to baselines and the state of the art? What are the limitations.
 \item \textbf{E2:} How effective are deep adversarial neural methods in adapting from one domain to another to learn a common task. How does it compare to the baselines and state of the art? What are the limitations?
 \item \textbf{E3:} How effective is $\mathsf{doc2vec}$ in adapting knowledge from one domain to another.
-\item \textbf{E4:} How effective are siamese networks in adapting knowledge from one domain to another.
+\item \textbf{E4:} How effective are Siamese networks in adapting knowledge from one domain to another.
 \end{itemize}
 
 \subsection{Experiment 1}
 To answer $\mathbf{E1}$, we measure the performance of our neural encoders against a baseline of $\mathsf{BM25 scores}$ provided for each query in the test set of the corpus. These scores are pre-computed for each query-positive and query-negative pair. The ranked list of these scores per query is used as a baseline performance on the four metrics we choose (see Section \ref{in_domain} for details on the metrics).
 
 \textbf{Implementation specifics:}
-In our implementation, we ensure that stop words are removed from the corpus. This reduces the average sentence length by 30\%. Each input in a batch that we pass to our network consists of words in a query, one positive question corresponding to it and all its corresponding negative questions. We pad unseen words in the pre-trained embeddings with 0s. We also equate sentence length in a batch by padding with 0s. The 0-padding is taken into account while mean pooling the intermediate results in the network. We do not train the pre-trained embedding layer. In this work, to limit computational requirements, we consider only the first 10 words in the title and the first 100 words in the body of each sentence. Further, we score only 40 random negative questions per query instead of the full 100 provided in the dataset. All hyperparameters are tuned on the dev set. The number of trainable network parameters are constrained to a budget of 450K parameters so that the expressability of the models are comparable.
+In our implementation, we ensure that stop words are removed from the corpus. This reduces the average sentence length by 30\%. Each input in a batch that we pass to our network consists of words in a query, one positive question corresponding to it and all its corresponding negative questions. We pad unseen words in the pre-trained embeddings with 0s. We also equate sentence length in a batch by padding with 0s. The 0-padding is taken into account while mean pooling the intermediate results in the network. We do not train the pre-trained embedding layer. In this work, to limit computational requirements, we consider only the first 10 words in the title and the first 100 words in the body of each sentence. Further, we score only 40 random negative questions per query instead of the full 100 provided in the dataset. All hyperparameters are tuned on the dev set. The number of trainable network parameters are constrained to a budget of 450K parameters so that the expressability of the models are comparable. Table {\color{red} XX} describes the various hyperparameters of the encoder and adversarial network. The model is trained on {\color{red} XX samples and tested on YY samples. All experiments were carried out on a XXX machine. Each model was run for {\color{red} XX epochs} to train. Each epoch took XX minutes, and we were able to train the network on the full training-set in under 180 minutes.}
+
+\textbf{Results:}
+Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of question retrieval and similiarity. CNN and LSTM denote the performance of our two neural encoders while $\textsf{BM25}$ denotes the baseline scores gathered from Apache Lucene. Against each of our models, we also record the number of trainable parameters used. The performance is on the scale $0$-$1$, where higher the number, better the retrieval. We analyze and discuss these results in Section \ref{discussion}.
+
+
+\begin{table}[h]
+\begin{tabular}{l|r|l|r}
+      \multicolumn{2}{c|}{\textbf{CNN}}
+     & \multicolumn{2}{c}{\textbf{LSTM}}
+     \\
+     \toprule
+     \textbf{Parameter}
+     & \textbf{Value}
+     & \textbf{Parameter}
+     & \textbf{Value}
+     \\
+     \midrule
+     output channels
+     & 250
+     & hidden size
+     & 128 $\times$ 2
+     \\
+     loss margin
+     & 0.4
+     & loss margin
+     & 0.4
+     \\
+     kernel size
+     & [1-5] $\times$ 300
+     & bidirectional
+     & true
+     \\
+     pooling
+     & average
+     & pooling
+     & average
+\end{tabular}
+\end{table}
+
+\subsection{Experiment 2} 
+To answer $\mathbf{E2}$, we measure the performance of domain adaptation on the \textit{Android Stack Exchange} dataset, having learnt a model on the \textit{Ask Ubuntu} dataset.
+
+\textbf{Evaluation:} The evaluation metric for this task is changed to instead evaluate a binary classification task - is a query similar to a given candidate question present in the corpus or not. As a consequence, the robustness of the system is measured using a $AUC(0.05)$ score. This designers of this problem statement chose this different metric compared to those used in $\mathbf{E1}$. This makes comparing results between the two experiments hard.
+
+\textbf{Baselines:} We establish multiple baselines - some stronger than the other. To begin with, we train a TF-IDF model on the $\textsf{source}$ domain and evaluate on the $\textsf{target}$ domain. As a slightly stronger baseline, we directly apply the model learnt in $\mathbf{E1}$ onto the $\textsf{target}$ domain.
+
+\textbf{Implementation specifics:} We train the encoder network from scratch to train the two objectives detailed in Section \ref{domain_adapt}. We maintain the constraint of evaluating on 40 negative samples for the $\mathsf{source}$ label classifier but do not vary the validation/test set for the $\mathsf{target}$ domain. We maintain the same constraints on the length of the title and body as in $\mathbf{E1}$. Stop-words and word-casing are handled for the $\mathsf{target}$ domain. We evaluate the system on both, pre-trained embeddings used in $\mathbf{E1}$ and off-the-shelf $\mathsf{GloVe}$ embeddings \cite{pennington2014glove}. All hyperparameters are tuned on the dev set. The model is trained on {\color{red} XX samples and tested on YY samples. All experiments were carried out on a XXX machine. Each model was run for {\color{red} XX epochs} to train. Each epoch took XX minutes, and we were able to train the network on the full training-set in under 180 minutes.}
+
+\textbf{Results:} Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of domain adaptation for question retrieval. Models with the suffix $\mathsf{xx-direct}$ in column 1, Table \ref{tab:exp1} correspond to the direct-transfer baseline models. The adversarial models are described with the suffix $\mathsf{xx-adv}$. The evaluation metric is AUC(0.05), which is reported on a scale of $0$-$1$. An AUC(0.05) score of $1$ implies that {\color{red}the model has a false positive rate of $<$0.05\%}. Results are reported for both, the dev and test sets. We analyze and discuss these results in Section \ref{discussion}.
+
+\begin{table}[h]
+    \begin{tabular}{l|r|l|r}
+          \multicolumn{2}{c|}{\textbf{CNN}}
+         & \multicolumn{2}{c}{\textbf{LSTM}}
+         \\
+         \toprule
+         \textbf{Parameter}
+         & \textbf{Value}
+         & \textbf{Parameter}
+         & \textbf{Value}
+         \\
+         \midrule
+         \# of sentences
+         & 40
+         & \# of sentences
+         & 50
+         \\
+         \# of stop words 
+         & 50
+         & \# of sentences
+         & 90
+         \\
+         mean word length - title
+         & 299
+         & \# of sentences
+         & 300
+         \\
+         mean word length - body
+         & 299
+         & \# of sentences
+         & 300
+         \\
+         Batch size
+         & 299
+         & \# of sentences
+         & 300
+         \\
+         Number of epochs
+         & 299
+         & \# of sentences
+         & 300
+         \\
+         mean word length - body
+         & 299
+         & \# of sentences
+         & 300
+    \end{tabular}
+    \caption{Parameters of the encoder and adversarial\protect\\ networks for domain adaptation}
+    \label{tab:param_indomain}
+\end{table}
+
+
+
+\subsection{Experiment 3}
+{\color{red} TODO}
+To answer $\mathbf{E1}$, we measure the performance of our neural encoders against a baseline of $\mathsf{BM25 scores}$ provided for each query in the test set of the corpus. These scores are pre-computed for each query-positive and query-negative pair. The ranked list of these scores per query is used as a baseline performance on the four metrics we choose (see Section \ref{in_domain} for details on the metrics).
+
+\textbf{Implementation specifics:}
+In our implementation, we ensure that stop words are removed from the corpus. This reduces the average sentence length by 30\%. Each input in a batch that we pass to our network consists of words in a query, one positive question corresponding to it and all its corresponding negative questions. We pad unseen words in the pre-trained embeddings with 0s. We also equate sentence length in a batch by padding with 0s. The 0-padding is taken into account while mean pooling the intermediate results in the network. We do not train the pre-trained embedding layer. In this work, to limit computational requirements, we consider only the first 10 words in the title and the first 100 words in the body of each sentence. Further, we score only 40 random negative questions per query instead of the full 100 provided in the dataset. All hyperparameters are tuned on the dev set. The number of trainable network parameters are constrained to a budget of 450K parameters so that the expressability of the models are comparable. Table {\color{red} XX} describes the various hyperparameters of the encoder and adversarial network. The model is trained on {\color{red} XX samples and tested on YY samples. All experiments were carried out on a XXX machine. Each model was run for {\color{red} XX epochs} to train. Each epoch took XX minutes, and we were able to train the network on the full training-set in under 180 minutes.}
+\begin{table}[h]
+ \begin{tabular}{l|r|l|r}
+          \multicolumn{2}{c|}{\textbf{Siamese}}
+         & \multicolumn{2}{c}{\textbf{\textsf{doc2vec}}}
+         \\
+         \toprule
+         \textbf{Parameter}
+         & \textbf{Value}
+         & \textbf{Parameter}
+         & \textbf{Value}
+         \\
+         \midrule
+         \# of sentences
+         & 40
+         & \# of sentences
+         & 50
+         \\
+         \# of stop words 
+         & 50
+         & \# of sentences
+         & 90
+         \\
+         mean word length - title
+         & 299
+         & \# of sentences
+         & 300
+         \\
+         mean word length - body
+         & 299
+         & \# of sentences
+         & 300
+    \end{tabular}
+    \caption{Parameters of $\mathsf{doc2vec}$ and the Siamese network architectures}
+    \label{tab:indomain}
+\end{table}
+
+\subsection{Experiment 4}
+{\color{red} TODO}
 
 \begin{table*}[h]
     \centering
-    \begin{tabular}{r | c | r r r r | r r r r}
-         Model name
-         & \# of parameters in the n/w
-         & \multicolumn{4}{c|}{Test}
-         & \multicolumn{4}{c}{Dev}
-         \\
+    \begin{tabular*}{0.8\textwidth}{c | m{0.12\linewidth} | c c c c | c c c r}
          \toprule
-         BM25 baseline
+         \toprule
+         
+         \multirow{2}{*}{\textbf{Model name}}
+         & \multirow{2}{*}{\textbf{\shortstack{\# of param \\ in the n/w}}}
+         & \multicolumn{4}{c|}{\textbf{Test}}
+         & \multicolumn{4}{c}{\textbf{Dev}}
+         \\
+         
+         &  
+         & \textbf{MRR}
+         & \textbf{P@1}
+         & \textbf{P@5}
+         & \textbf{MAP}
+         
+         & \textbf{MRR}
+         & \textbf{P@1}
+         & \textbf{P@5}
+         & \textbf{MAP}
+         \\
+         \midrule
+         \textbf{BM25 baseline}
          & NA
          & 0.68
          & 0.54
@@ -442,7 +509,7 @@ In our implementation, we ensure that stop words are removed from the corpus. Th
          & 0.52
          \\
          \midrule
-         CNN
+         \textbf{CNN}
          & 337290
          & 0.63
          & 0.48
@@ -454,7 +521,7 @@ In our implementation, we ensure that stop words are removed from the corpus. Th
          & 0.51
          \\
          \midrule
-         LSTM
+         \textbf{LSTM}
          & 337290
          & 0.69
          & 0.54
@@ -465,79 +532,90 @@ In our implementation, we ensure that stop words are removed from the corpus. Th
          & 0.44
          & 0.54
          
-    \end{tabular}
+    \end{tabular*}
     \caption{Results for Experiment 1 - In-domain learning using neural models}
     \label{tab:exp1}
-    
-    
-    \centering
-    \begin{tabular}{r | c | r r}
-    Model name
-    & Description
-    & AUC(0.05) - Test
-    & AUC(0.05) - Val
+ 
+ \vspace{7pt}
+  
+    \begin{tabular}{r | c | r | r}
+    \toprule
+    \toprule
+    \textbf{Model name}
+    & \textbf{Description}
+    & \textbf{AUC(0.05) - Test}
+    & \textbf{AUC(0.05) - Dev}
     \\
     \toprule
-    TF-IDF
+    \textbf{TF-IDF}
     & Baseline
     & 0.58
     & 0.58
     \\
-    \midrule
-    CNN-Direct
+    \cmidrule{1-4} 
+    \textbf{CNN-direct}
     & \multirow{2}{*}{Direct transfer}
     & 0.62
     & 0.62
     \\
-    
-    LSTM-direct
+    \cmidrule{1-1} 
+    \cmidrule{3-4} 
+    \textbf{LSTM-direct}
     & 
     & 0.62
     & 0.63
     \\
     \midrule
-    CNN-adv
+    \textbf{CNN-adv}
     & \multirow{2}{*}{Adversarial domain transfer}
     & 0.70
     & 0.70
     \\
-    
-    LSTM-adv
+    \cmidrule{1-1} 
+    \cmidrule{3-4}
+    \textbf{LSTM-adv}
+    &
+    & 0.70
+    & 0.70
+    \\
+    \midrule
+    \textbf{Siamese networks}
+    & \multirow{2}{*}{Other domain transfer methods}
+    & 0.70
+    & 0.70
+    \\
+    \cmidrule{1-1} 
+    \cmidrule{3-4}
+    \textbf{\textsf{Doc2Vec}}
     &
     & 0.70
     & 0.70
     \\
     \bottomrule
     \end{tabular}
-    
+    \caption{Results from Experiment 2 - Domain adaptation}
 \end{table*}
 
 
-\subsection{Experiment 2} 
-To answer $\mathbf{E2}$, we measure the performance of domain adaptation on the \textit{Android Stack Exchange} dataset, having learnt a model on the \textit{Ask Ubuntu} dataset.
-
-\textbf{Evaluation:} The evaluation metric for this task is changed to instead evaluate a binary classification task - is a query similar to a given candidate question present in the corpus or not. As a consequence, the robustness of the system is measured using a $AUC(0.05)$ score. This designers of this problem statement chose this different metric compared to those used in $\mathbf{E1}$. This makes comparing results between the two experiments hard.
-
-\textbf{Baselines:} We establish multiple baselines - some stronger than the other. To begin with, we train a TF-IDF model on the $\textsf{source}$ domain and evaluate on the $\textsf{target}$ domain. As a slightly stronger baseline, we directly apply the model learnt in $\mathbf{E1}$ onto the $\textsf{target}$ domain.
-
-\textbf{Implementation specifics:} We train the encoder network from scratch to train the two objectives detailed in Section \ref{domain_adapt}. We maintain the constraint of evaluating on 40 negative samples for the $\mathsf{source}$ label classifier but do not vary the validation/test set for the $\mathsf{target}$ domain. We maintain the same constraints on the length of the title and body as in $\mathbf{E1}$. Stop-words and word-casing are handled for the $\mathsf{target}$ domain. We evaluate the system on both, pre-trained embeddings used in $\mathbf{E1}$ and off-the-shelf $\mathsf{GloVe}$ embeddings \cite{pennington2014glove}. All hyperparameters are tuned on the dev set.
-
-\subsection{Experiment 3}
-{\color{red} TODO}
-
-\subsection{Experiment 4}
-{\color{red} TODO}
-
-\section{Results}
-{\color{red} To merge this section with the one above, i.e. just have one: experimental results}
-We analyze the results of each of our four experiments.
-\subsection{Experiment 1}
-Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of question retrieval and similiarity. We denote
+\begin{figure*}[h]
+\begin{tabular}{cccc}
+    \includegraphics[width=0.5\columnwidth]{img/cnn_training_loss_toy}
+&   \includegraphics[width=0.5\columnwidth]{img/cnn_domain_transfer_adversarial_gradient_norm}
+&   \includegraphics[width=0.5\columnwidth]{img/domain_transfer_direct_lstm_hist}
+&   \includegraphics[width=0.5\columnwidth]{img/cnn_domain_transfer_adversarial_lstm}
+\end{tabular}
+\label{fig:len_hist}
+\caption{Results from Experiment 1}
+\end{figure*}
 
 \section{Discussion}
 \label{discussion}
+\subsection{Experiment 1}
 {\color{red}TODO: add adversarial training objectives, discuss stability of changing lambda, discuss differences with siamese networks etc.}
+We observe that both, the LSTM and the CNN networks, beat the \textsf{BM25} baseline by {\color{red}XX points} on an average on each of the metrics. We notice that this accuracy is achieved with a very simple model architecture, without any effort invested in engineering features. Such a performance by off-the-shelf models suggests that neural models are an apt choice for modeling such tasks.  Figures \ref{fig:len_hist, fig:len_hist} describe the loss function over different epochs for the CNN and LSTM respectively. We note here though that we found the results to be sensitive to different hyperparameter choices. With the right choice of hyperparameters, we could gain 10 points on an average on all the metrics. For instance, we found \textsf{tanh} to produce better results over using \textsf{ReLU} as an activation function for the CNNs. We found the learning rates of \textit{Adam}, the optimizer, when outside the range of {\color{red}XX, to have an adverse effect on the results}. We found that mean pooling and max pooling produced comparable results on both networks. We found the choice of the margin in the maximum-margin separator to specially have an effect on the performance. Moving it by 0.5 points above or below the margin set for the final models (see Table \ref{tab:hyperparam_exp1}) decreased the final accuracy by 0.10 units.
 
+\subsection{Experiment 2}
+The baseline is measured against an unsupervised (TF-IDF) model being learnt on the \textsf{source} domain. In comparison, we see the direct transfer model to perform slightly better by both, the CNN and LSTM. This is expected since these models learn , but relatively the 
 %ACKNOWLEDGEMENTS are optional
 \section{Acknowledgements}
 \label{ack}
