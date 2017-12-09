@@ -10,8 +10,11 @@ from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 
 import gensim
+import ConfigParser
 import multiprocessing
+import cPickle as pickle
 from random import shuffle
+from collections import defaultdict
 
 from meter import AUCMeter 
 from sklearn.metrics import auc
@@ -24,6 +27,10 @@ np.random.seed(0)
 
 DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
 DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
+
+config = ConfigParser.ConfigParser()
+config.readfp(open(r'config.ini'))
+SAVE_PATH = config.get('paths', 'save_path')
 
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
@@ -191,5 +198,17 @@ plt.legend(loc='upper right')
 plt.ylabel('normalized histogram')
 plt.title('pos and neg class separation')
 plt.savefig('../figures/domain_transfer_doc2vec_hist.png')
+
+#save for plotting
+figures_da_doc2vec = {}
+figures_da_doc2vec['doc2vec_ytrue'] = y_true 
+figures_da_doc2vec['doc2vec_ypred'] = y_pred 
+figures_da_doc2vec['doc2vec_roc_auc'] = roc_auc
+figures_da_doc2vec['doc2vec_auc_meter'] = roc_auc_0p05fpr_meter
+figures_da_doc2vec['doc2vec_auc_sklearn'] = roc_auc_0p05fpr
+
+filename = SAVE_PATH + 'figures_da_doc2vec.dat' 
+with open(filename, 'w') as f:
+    pickle.dump(figures_da_doc2vec, f)
 
 

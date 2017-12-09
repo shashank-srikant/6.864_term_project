@@ -30,6 +30,7 @@ np.random.seed(0)
 DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
 DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
 
+
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
 
@@ -39,7 +40,7 @@ config.readfp(open(r'config.ini'))
 SAVE_PATH = config.get('paths', 'save_path')
 RNN_SAVE_NAME = config.get('rnn_params', 'save_name')
 CNN_SAVE_NAME = config.get('cnn_params', 'save_name')
-EMBEDDINGS_FILE = config.get('paths', 'embeddings_path')
+EMBEDDINGS_FILE = config.get('paths', 'glove_path')
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
 TRAIN_SAMPLE_SIZE = int(config.get('data_params', 'TRAIN_SAMPLE_SIZE'))
@@ -270,7 +271,7 @@ class SIAMESE_RNN(nn.Module):
                             bidirectional=True, batch_first=True)
         self.fc1 = nn.Linear(hidden_size * 2, int(hidden_size * 4.0/3.0))
         self.fc2 = nn.Linear(int(hidden_size * 4.0/3.0), hidden_size)
-        self.dropout = nn.Dropout(0.5) #p=0.2 prob of dropout = (1 - keep prob)  
+        self.dropout = nn.Dropout(0.5) #prob of dropout = (1 - keep prob)  
         self.hidden = self.init_hidden()
     
     def init_hidden(self):
@@ -321,11 +322,7 @@ if use_gpu:
 print "class weights: ", class_weights
 
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
-
-tot_num_params = 0
-for param in model_parameters:
-    tot_num_params += np.prod(param.size())
-#end for
+tot_num_params = sum([np.prod(p.size()) for p in model_parameters])
 print "number of trainable params: ", tot_num_params
 
 criterion = ContrastiveLoss(margin=0.5) 
@@ -576,5 +573,19 @@ plt.legend(loc='upper right')
 plt.ylabel('normalized histogram')
 plt.title('pos and neg class separation')
 plt.savefig('../figures/domain_transfer_direct_lstm_hist.png')
+
+#save for plotting
+figures_da_siamese = {}
+figures_da_siamese['siamese_ytrue'] = y_true 
+figures_da_siamese['siamese_ypred'] = y_pred_lstm 
+figures_da_siamese['siamese_roc_auc'] = roc_auc
+figures_da_siamese['siamese_auc_meter'] = roc_auc_0p05fpr_meter
+figures_da_siamese['siamese_auc_sklearn'] = roc_auc_0p05fpr
+figures_da_siamese['siamese_training_loss'] = training_loss
+
+filename = SAVE_PATH + 'figures_da_siamese.dat' 
+with open(filename, 'w') as f:
+    pickle.dump(figures_da_siamese, f)
+
 
 
