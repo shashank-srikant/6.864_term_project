@@ -16,6 +16,7 @@ import ConfigParser
 from tqdm import tqdm
 from time import time
 import cPickle as pickle
+from collections import defaultdict
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from ranking_metrics import compute_mrr, precision_at_k, compute_map
@@ -27,6 +28,7 @@ config = ConfigParser.ConfigParser()
 config.readfp(open(r'config.ini'))
 
 SAVE_PATH = config.get('paths', 'save_path')
+DATA_PATH = config.get('paths', 'data_path')
 DATA_FILE_NAME = config.get('paths', 'extracted_data_file_name')
 TRAIN_TEST_FILE_NAME = config.get('paths', 'train_test_file_name')
 SAVE_NAME = config.get('rnn_params', 'save_name')
@@ -35,8 +37,8 @@ NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE'))
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
 
-data_filename = SAVE_PATH + DATA_FILE_NAME
-train_test_filename = SAVE_PATH + TRAIN_TEST_FILE_NAME
+data_filename = DATA_PATH + DATA_FILE_NAME
+train_test_filename = DATA_PATH + TRAIN_TEST_FILE_NAME
 
 print "loading pickled data..."
 tic = time()
@@ -503,7 +505,6 @@ print "lstm P@5 (test): ", np.mean(lstm_pr5_test)
 lstm_map_test = compute_map(test_idx_df, score_name='lstm_score')
 print "lstm map (test): ", np.mean(lstm_map_test)
 
-
 #generate plots
 plt.figure()
 plt.plot(training_loss, label='Adam')
@@ -520,4 +521,24 @@ plt.xlabel("Epoch")
 plt.ylabel("Learning rate")
 plt.legend()
 plt.savefig('../figures/lstm_learning_rate_schedule.png')
+
+#save for plotting
+figures_lstm = {}
+figures_lstm['lstm_mrr_val'] = [np.mean(lstm_mrr_val)]
+figures_lstm['lstm_pr1_val'] = [np.mean(lstm_pr1_val)]
+figures_lstm['lstm_pr5_val'] = [np.mean(lstm_pr5_val)]
+figures_lstm['lstm_map_val'] = [np.mean(lstm_map_val)]
+
+figures_lstm['lstm_mrr_test'] = [np.mean(lstm_mrr_test)]
+figures_lstm['lstm_pr1_test'] = [np.mean(lstm_pr1_test)]
+figures_lstm['lstm_pr5_test'] = [np.mean(lstm_pr5_test)]
+figures_lstm['lstm_map_test'] = [np.mean(lstm_map_test)]
+
+figures_lstm['lstm_training_loss'] = training_loss
+figures_lstm['lstm_learning_rate'] = learning_rate_schedule 
+
+filename = SAVE_PATH + 'figures_lstm.dat' 
+with open(filename, 'w') as f:
+    pickle.dump(figures_lstm, f)
+
 

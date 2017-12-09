@@ -15,6 +15,7 @@ import ConfigParser
 from tqdm import tqdm
 from time import time
 import cPickle as pickle
+from collections import defaultdict
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from ranking_metrics import compute_mrr, precision_at_k, compute_map
@@ -24,6 +25,7 @@ np.random.seed(0)
 
 config = ConfigParser.ConfigParser()
 config.readfp(open(r'../src/config.ini'))
+DATA_PATH = config.get('paths', 'data_path')
 SAVE_PATH = config.get('paths', 'save_path')
 DATA_FILE_NAME = config.get('paths', 'extracted_data_file_name')
 TRAIN_TEST_FILE_NAME = config.get('paths', 'train_test_file_name')
@@ -33,8 +35,8 @@ NUM_NEGATIVE = int(config.get('data_params', 'NUM_NEGATIVE'))
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
 
-data_filename = SAVE_PATH + DATA_FILE_NAME
-train_test_filename = SAVE_PATH + TRAIN_TEST_FILE_NAME
+data_filename = DATA_PATH + DATA_FILE_NAME
+train_test_filename = DATA_PATH + TRAIN_TEST_FILE_NAME
 
 print "loading pickled data..."
 tic = time()
@@ -49,7 +51,7 @@ print "elapsed time: %.2f sec" %(toc - tic)
 
 #training parameters
 num_epochs = 16
-batch_size = 48
+batch_size = 32 
 
 #model parameters
 embed_num = len(word_to_idx)
@@ -76,7 +78,7 @@ class  CNN(nn.Module):
     def forward(self, x):
         x = self.embed(x) # (N,W,D)
         x = x.unsqueeze(1) # (N,Ci,W,D)
-        x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1] #[(N,Co,W), ...]*len(Ks)
+        x = [F.tanh(conv(x)).squeeze(3) for conv in self.convs1] #[(N,Co,W), ...]*len(Ks)
         x = [F.avg_pool1d(i, i.size(2)).squeeze(2) for i in x] #[(N,Co), ...]*len(Ks)
         x = torch.cat(x, 1)
         return x
@@ -91,7 +93,7 @@ if use_gpu:
 print model
 
 #define loss and optimizer
-criterion = nn.MultiMarginLoss(p=1, margin=0.35, size_average=True)
+criterion = nn.MultiMarginLoss(p=1, margin=0.4, size_average=True)
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 optimizer = torch.optim.Adam(model_parameters, lr=learning_rate, weight_decay=weight_decay)
 scheduler = StepLR(optimizer, step_size=4, gamma=0.5) #half learning rate every 4 epochs
@@ -178,7 +180,7 @@ for epoch in range(num_epochs):
     learning_rate_schedule.append(scheduler.get_lr())
     print "epoch: %4d, training loss: %.4f" %(epoch+1, running_train_loss)
     
-    #torch.save(model, SAVE_PATH + SAVE_NAME)
+    torch.save(model, SAVE_PATH + SAVE_NAME)
 
     #early stopping
     patience = 4
@@ -416,3 +418,24 @@ print "cnn P@5 (val): ", np.mean(cnn_pr5_val)
 
 cnn_map_val = compute_map(dev_idx_df, score_name='cnn_score')
 print "cnn map (val): ", np.mean(cnn_map_val)
+
+#save for plotting
+figures_cnn = {}
+figures_cnn['cnn_mrr_val'] = [np.mean(cnn_mrr_val)]
+figures_cnn['cnn_pr1_val'] = [np.mean(cnn_pr1_val)]
+figures_cnn['cnn_pr5_val'] = [np.mean(cnn_pr5_val)]
+figures_cnn['cnn_map_val'] = [np.mean(cnn_map_val)]
+
+figures_cnn['cnn_mrr_test'] = [np.mean(cnn_mrr_test)]
+figures_cnn['cnn_pr1_test'] = [np.mean(cnn_pr1_test)]
+figures_cnn['cnn_pr5_test'] = [np.mean(cnn_pr5_test)]
+figures_cnn['cnn_map_test'] = [np.mean(cnn_map_test)]
+
+figures_cnn['cnn_training_loss'] = training_loss
+figures_cnn['cnn_learning_rate'] = learning_rate_schedule 
+
+filename = SAVE_PATH + 'figures_cnn.dat' 
+with open(filename, 'w') as f:
+    pickle.dump(figures_cnn, f)
+
+
