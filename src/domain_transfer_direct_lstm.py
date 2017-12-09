@@ -7,6 +7,7 @@ import ConfigParser
 from tqdm import tqdm
 from time import time
 import cPickle as pickle
+from collections import defaultdict
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 
@@ -354,5 +355,16 @@ plt.ylabel('normalized histogram')
 plt.title('pos and neg class separation')
 plt.savefig('../figures/domain_transfer_direct_lstm_hist.png')
 
+#save for plotting
+figures_da_lstm_direct = {}
+figures_da_lstm_direct['lstm_direct_ytrue'] = y_true 
+figures_da_lstm_direct['lstm_direct_ypred'] = y_pred_lstm 
+figures_da_lstm_direct['lstm_direct_roc_auc'] = roc_auc
+figures_da_lstm_direct['lstm_direct_auc_meter'] = roc_auc_0p05fpr_meter
+figures_da_lstm_direct['lstm_direct_auc_sklearn'] = roc_auc_0p05fpr
+
+filename = SAVE_PATH + 'figures_da_lstm_direct.dat' 
+with open(filename, 'w') as f:
+    pickle.dump(figures_da_lstm_direct, f)
 
 

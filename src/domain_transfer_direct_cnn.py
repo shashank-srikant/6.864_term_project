@@ -7,6 +7,7 @@ import ConfigParser
 from tqdm import tqdm
 from time import time
 import cPickle as pickle
+from collections import defaultdict
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 
@@ -31,7 +32,9 @@ stop = set(stopwords.words('english'))
 config = ConfigParser.ConfigParser()
 config.readfp(open(r'config.ini'))
 
-DATA_PATH_TARGET = config.get('paths', 'data_path_target')
+DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
+DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
+#DATA_PATH_TARGET = config.get('paths', 'data_path_target')
 
 SAVE_PATH = config.get('paths', 'save_path')
 RNN_SAVE_NAME = config.get('rnn_params', 'save_name')
@@ -39,7 +42,7 @@ CNN_SAVE_NAME = config.get('cnn_params', 'save_name')
 EMBEDDINGS_FILE = config.get('paths', 'embeddings_path')
 MAX_TITLE_LEN = int(config.get('data_params', 'MAX_TITLE_LEN'))
 MAX_BODY_LEN = int(config.get('data_params', 'MAX_BODY_LEN'))
-TARGET_POS_NEG_FILE_NAME = config.get('paths', 'TARGET_POS_NEG_FILE_NAME')
+#TARGET_POS_NEG_FILE_NAME = config.get('paths', 'TARGET_POS_NEG_FILE_NAME')
 #TODO: do we keep the same title and body len for android dataset?
 
 def get_embeddings():
@@ -74,7 +77,6 @@ def generate_data(data_frame, train_text_df, word_to_idx, tokenizer):
 
     dataset = []
     for idx in tqdm(range(data_frame.shape[0])):
-    #for idx in tqdm(range(1000)):
         q1_id = data_frame.loc[idx, 'id_1']
         q2_id = data_frame.loc[idx, 'id_2']
 
@@ -110,7 +112,8 @@ def generate_data(data_frame, train_text_df, word_to_idx, tokenizer):
 #load data
 print "loading data..."
 tic = time()
-target_text_file = DATA_PATH_TARGET + '/corpus.txt'
+#target_text_file = DATA_PATH_TARGET + '/corpus.txt'
+target_text_file = DATA_PATH_TARGET + '/corpus.tsv'
 target_text_df = pd.read_table(target_text_file, sep='\t', header=None)
 target_text_df.columns = ['id', 'title', 'body']
 target_text_df = target_text_df.dropna()
@@ -144,11 +147,11 @@ target_neg_data = generate_data(target_neg_df, target_text_df, word_to_idx, toke
 toc = time()
 print "elapsed time: %.2f sec" %(toc - tic)
 
-filename = SAVE_PATH + TARGET_POS_NEG_FILE_NAME
-with open(filename, 'w') as f:
-    pickle.dump([target_pos_data, target_neg_data], f)
-
-sys.exit(0)
+#filename = SAVE_PATH + TARGET_POS_NEG_FILE_NAME
+#with open(filename, 'w') as f:
+#    pickle.dump([target_pos_data, target_neg_data], f)
+#
+#sys.exit(0)
 
 print "loading CNN model pre-trained on source dataset..."
 #CNN architecture
@@ -168,7 +171,7 @@ class  CNN(nn.Module):
     def forward(self, x):
         x = self.embed(x) # (N,W,D)
         x = x.unsqueeze(1) # (N,Ci,W,D)
-        x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1] #[(N,Co,W), ...]*len(Ks)
+        x = [F.tanh(conv(x)).squeeze(3) for conv in self.convs1] #[(N,Co,W), ...]*len(Ks)
         x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x] #[(N,Co), ...]*len(Ks)
         x = torch.cat(x, 1)
         return x
@@ -177,8 +180,8 @@ class  CNN(nn.Module):
 batch_size = 32
 embed_num = len(word_to_idx)
 embed_dim = len(embeddings[0])
-kernel_num = 200  
-kernel_sizes = range(2,6)
+kernel_num = 250  
+kernel_sizes = range(1,6)
 model = CNN(embed_num, embed_dim, kernel_num, kernel_sizes)
 
 #CNN weights
@@ -313,5 +316,16 @@ plt.ylabel('normalized histogram')
 plt.title('pos and neg class separation')
 plt.savefig('../figures/domain_transfer_direct_cnn_hist.png')
 
+#save for plotting
+figures_da_cnn_direct = {}
+figures_da_cnn_direct['cnn_direct_ytrue'] = y_true 
+figures_da_cnn_direct['cnn_direct_ypred'] = y_pred_cnn 
+figures_da_cnn_direct['cnn_direct_roc_auc'] = roc_auc
+figures_da_cnn_direct['cnn_direct_auc_meter'] = roc_auc_0p05fpr_meter
+figures_da_cnn_direct['cnn_direct_auc_sklearn'] = roc_auc_0p05fpr
+
+filename = SAVE_PATH + 'figures_da_cnn_direct.dat' 
+with open(filename, 'w') as f:
+    pickle.dump(figures_da_cnn_direct, f)
 
 

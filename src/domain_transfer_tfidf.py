@@ -4,8 +4,11 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+import ConfigParser
 from tqdm import tqdm
 from time import time
+import cPickle as pickle
+from collections import defaultdict
 from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 
@@ -20,6 +23,10 @@ np.random.seed(0)
 
 DATA_PATH_SOURCE = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/askubuntu/'
 DATA_PATH_TARGET = '/data/vision/fisher/data1/vsmolyakov/nlp_project/data/android/'
+
+config = ConfigParser.ConfigParser()
+config.readfp(open(r'../src/config.ini'))
+SAVE_PATH = config.get('paths', 'save_path')
 
 tokenizer = RegexpTokenizer(r'\w+')
 stop = set(stopwords.words('english'))
@@ -133,5 +140,18 @@ plt.legend(loc='upper right')
 plt.ylabel('normalized histogram')
 plt.title('pos and neg class separation')
 plt.savefig('../figures/domain_transfer_tfidf_hist.png')
+
+#save for plotting
+figures_da_tfidf = {}
+figures_da_tfidf['tfidf_ytrue'] = y_true 
+figures_da_tfidf['tfidf_ypred'] = y_pred 
+figures_da_tfidf['tfidf_roc_auc'] = roc_auc
+figures_da_tfidf['tfidf_auc_meter'] = roc_auc_0p05fpr_meter
+figures_da_tfidf['tfidf_auc_sklearn'] = roc_auc_0p05fpr
+
+
+filename = SAVE_PATH + 'figures_da_tfidf.dat' 
+with open(filename, 'w') as f:
+    pickle.dump(figures_da_tfidf, f)
 
 
