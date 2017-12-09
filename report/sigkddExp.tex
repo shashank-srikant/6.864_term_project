@@ -22,6 +22,7 @@
 \usepackage[table,x11names]{xcolor}
 \usepackage{color}
 \usepackage{enumitem}
+\usepackage{soul}
 
 \begin{document}
 
@@ -79,7 +80,7 @@
 \date{30 July 1999}
 \maketitle
 \begin{abstract}
-Content on the internet grows at an exponential rate. Given this growth, finding relevant information accurately becomes a critical task for the NLP community to address. More so, with this rapid growth, curating labeled datasets to build models for the wide variety of content available on the internet has become extremely time and resource intensive. In this work, we explore whether neural models are able to successfully model content similarity and retrieval tasks, and whether they can transfer knowledge from one domain, where supervised labels are available, to a domain with no available labels. Specifically, we explore content similarity in online discussion forums, where we explore the following questions - a. how effectively can neural approaches model question-answer retrieval tasks, which is, given a question and answer pair present on an online discussion forum, how effectively can neural approaches find similar pairs on that forum. b. Given a model of question-answer similarity in one online discussion forum, how effective are neural approaches in transferring that knowledge to a new, loosely related domain. In this work, we explore a baseline approach of modeling question similarity tasks on the popular Stack Exchange online community \textit{Ask Ubuntu}. We show how neural architectures like LSTMs and CNNs outperform traditional approaches in information retrieval. Additionally, and importantly, we explore the problem of transferring these models to detect question-answer similarity on \textit{Android Stack Exchange},  a similar yet different online discussion community where members troubleshoot Android related problems. We show how neural domain adaptation techniques successfully beat baseline IR techniques and direct neural transfer techniques. We also discuss some limitations and challenges in using such architectures.
+Content on the internet grows at an exponential rate. Given this growth, finding relevant information accurately becomes a critical task for the NLP community to address. More so, with this rapid growth, curating labeled datasets to build models for the wide variety of content available on the internet has become extremely time and resource intensive. In this work, we explore whether neural models are able to successfully model content similarity and retrieval tasks, and whether they can transfer knowledge from one domain, where supervised labels are available, to a domain with no available labels. Specifically, we explore content similarity in online discussion forums, where we explore the following questions - a. how effectively can neural approaches model question-answer retrieval tasks, which is, given a question and answer pair present on an online discussion forum, how effectively can neural approaches find similar pairs on that forum. b. Given a model of question-answer similarity in one online discussion forum, how effective are neural approaches in transferring that knowledge to a new, loosely related domain. In this work, we explore a baseline approach of modeling question similarity tasks on the popular Stack Exchange online community \textit{AskUbuntu}. We show how neural architectures like LSTMs and CNNs outperform traditional approaches in information retrieval. Additionally, and importantly, we explore the problem of transferring these models to detect question-answer similarity on \textit{Android Stack Exchange},  a similar yet different online discussion community where members troubleshoot Android related problems. We show how neural domain adaptation techniques successfully beat baseline IR techniques and direct neural transfer techniques. We also discuss some limitations and challenges in using such architectures.
 \end{abstract}
 
 \begin{table*}[th]
@@ -209,31 +210,30 @@ We first explore the task of question similarity by training a domain-specific c
 \subsection{Dataset}
 We describe here the dataset that we base our work on.
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-\item The \textit{AskUbuntu} dataset consists of question and answers related to problems people face in Ubuntu, the operating system
-\item Each query has two components - a title and main body. The average title length is {\color{red} XX} words and the average body length is {\color{red} YY words} long. Figure \ref{fig:len_hist} shows the distribution of word lengths.
-\item In this work, to limit computational requirements, we consider only the first 10 words in the title and the first 100 words in the body of each sentence.
-\item The \textit{AskUbuntu} platform has a section where users flag similar questions. We use that as a weak signal to inform our true labels, since these user-flagged suggestions are not complete and suffer from high recall issues.
-\item Each query is associated with $40$ randomly drawn dis-similar examples.
-\item We trained on 110K queries, where for each query we had $1$ positive (similar) and $100$ negative (dissimilar) examples provided in the dataset.
-\item In the test set, for each pair of similar and dissimilar questions, we are also given the $\mathsf{BM25 scores}$, their similarity as measured by an industrial IR-system. These serve as a baseline for all our experiments.
+\item The \textit{Ask Ubuntu} dataset consists of questions and answers related to problems people face in Ubuntu, the Linux operating system
+\item Each query has two components - a title and main body. The average title length is {\color{red} XX} words and the average body length is {\color{red} YY words} long. Figure \ref{fig:len_hist} shows the distribution of word lengths
+\item Each query is associated with a few ($<10$) positive (similar) questions and $100$ randomly drawn questions from the corpus which serve as negative (dissimilar) questions.
+\item The dataset contained 110K such queries to train on.
+\item Each query-question pair is also associated with its $\mathsf{BM25 scores}$ provided by Apache Lucene. This served as a baseline in our experiments.
 \end{itemize}
 
 \subsection{Model}
 We model the task of in-domain question similarity as follows:
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-  \item We define a word-level deep neural network. The network takes in a word at a time, and is represented by embeddings.  This word can either belong to the title or the body of a query. In this work, we average the embeddings from the title and body of each query, and use the averaged embeddings to classify similarity.
-  \item We use pre-trained embeddings on data drawn from both, the source domain and Wikipedia. Both these data sources are rich, are easily available and training these embeddings using Word2Vec etc. are relatively straightforward.
+  \item We define a word-level deep neural network (DNN). The network takes a sequence of indices corresponding to word embeddings. We average the title and the body of each query, and use the averaged representation to compute similarity.
+  \item We use word embeddings pre-trained on source domain and the Wikipedia.
   \item To train the classifier to find similar and dissimilar questions for a given query, we associate each query with two sets of texts - the set of similar questions as marked by users on \textit{Ask Ubuntu}, and 100 randomly sampled questions from the corpus which serve as dissimilar pairs. The user-defined questions are used only during training. Since user-marked similar questions are not comprehensive and serve only as a weak proxy, the system is tested on expert-marked similar questions.
-  \item In this setup, we find the distances between a query and its similar questions and dissimilar questions by defining a similarity operation over its embeddings. We use the cosine distance between the embeddings as a similiarity operation.
-  \item We use a maxmargin framework for learning parameters $\theta$ of our network. Specifically, in a context of a particular training example where $q_i$ is paired with $p^+_i$, we minimize the max-margin loss $L(\theta)$ defined as\\
+  \item We use cosine similarity to rank similar questions by computing the cosine of the angle between the query encoding and its associated candidate question.
+  \item We use a max-margin framework for learning parameters $\theta$ of our network. Specifically, in a context of a particular training example where $q_i$ is paired with $p^+_i$, we minimize the max-margin loss $L(\theta)$ defined as\\
   \begin{equation}
   \max_{p^- \in Q(q_i)} \{s(q_i,p^-;\theta) - s(q_i,p^+_i;\theta) + \delta(p, p^+_i)\}
   \end{equation}
 where $\delta(.,.)$ denotes a non-negative margin. We set $\delta(p, p^+_i)$ to be a small constant when $p \neq p^+_i$ and 0 otherwise. The parameters $\theta$ can be optimized through sub-gradients ${\partial L}/{\partial \theta}$ aggregated over small batches of the training instances \cite{lei2015semi}.
-  \item The neural network essentially serves as an encoder to generate a representation in a low-dimension space which encodes the loss function $L(.)$ defined above.
-  \item In this work, we implement two neural networks, LSTMs and CNNs, as these encoders.
-  \item Similarity is evaluated on standard information retrieval metrics like \textit{Precision@1}, \textit{Precision@5}, \textit{Mean Average Precision}, and \textit{Mean Reciprocal Rank}. The inputs to each of these metrics is a ranked list of numbers. We pass in the cosine similarity scores obtained between the query and each of the positive and negative questions associated with that query, as our ranked list. The $\mathsf{bm25 scores}$ for each of these pairs is used as a baseline similarity score and their evaluations on the metrics mentioned above are considered the baseline performance indicators for this approach.
+  \item The neural network essentially serves as an encoder to generate a representation in a low-dimension space.
+  \item We compare performance on two neural network architectures: Long Short-Term Memory (LSTM) Recurrent Neural Network (RNN) and a Convolutional Neural Network (CNN).
+  \item Similarity is evaluated on standard information retrieval metrics like \textit{Precision@1}, \textit{Precision@5}, \textit{Mean Average Precision}, and \textit{Mean Reciprocal Rank}. The inputs to each of these metrics is a ranked list of scores. We pass in the cosine similarity scores obtained between the query and each of the positive and negative questions associated with that query, as our ranked list. The $\mathsf{BM25 scores}$ for each of these pairs is used as a baseline similarity score and their evaluations on the metrics mentioned above are considered the baseline performance indicators for this approach.
 \end{itemize}
+
 
 \begin{table}[h]
 \begin{tabular}{l|r|l|r}
@@ -241,34 +241,35 @@ where $\delta(.,.)$ denotes a non-negative margin. We set $\delta(p, p^+_i)$ to 
      & \multicolumn{2}{c}{LSTM}
      \\
      \toprule
-     Parameter
-     & Value
-     & Parameter
-     & Value
+     \textbf{Parameter}
+     & \textbf{Value}
+     & \textbf{Parameter}
+     & \textbf{Value}
      \\
-     \# of sentences
-     & 40
-     & \# of sentences
-     & 50
+     output channels
+     & 250
+     & hidden size
+     & 128 $\times$ 2
      \\
-     \# of stop words 
-     & 50
-     & \# of sentences
-     & 90
+     loss margin
+     & 0.4
+     & loss margin
+     & 0.4
      \\
-     mean word length - title
-     & 299
-     & \# of sentences
-     & 300
+     kernel size
+     & [1-5] $\times$ 300
+     & bidirectional
+     & true
      \\
-     mean word length - body
-     & 299
-     & \# of sentences
-     & 300
+     pooling
+     & average
+     & pooling
+     & avergae
 \end{tabular}
 \caption{Parameters of our encoder networks for in-domain classification}
 \label{tab:indomain}
 \end{table}
+
 
 \subsection{CNN}
 We describe the CNN architecture implemented in this work. We detail the inputs to the different layers of the network, which should help illustrate the architecture.
@@ -282,6 +283,7 @@ We define a CNN with the following layers -
 \end{itemize}
 
 \subsection{LSTM}
+{\color{red} TODO: describe the architecture, add a figure for both CNN and LSTM}
 We describe the CNN architecture implemented in this work. We detail the inputs to the different layers of the network, which should help illustrate the architecture.
 We define a CNN with the following layers -
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
@@ -294,11 +296,11 @@ We define a CNN with the following layers -
 
 \section{Domain Adaptation (DA)}
 \label{domain_adapt}
-We use neural adversarial techniques\cite{ganin2015unsupervised} to adapt to a domain having no labeled data, having trained a model on a domain with labeled data. In this section and the next, we describe the dataset we worked on, the architecture for the adversarial model we use, and other models for DA we tried.
+ We use adversarial training techniques \cite{ganin2015unsupervised} to adapt to a domain having no labeled data, having trained a model on a domain with labeled data. In this section and the next, we describe the dataset we worked on, the architecture for the adversarial model we use, and other models for DA we tried.
 
 
 \subsection{Dataset}
-We worked with two datasets, one as our $\mathsf{source}$ domain, wherein we had labeled data and another as our $\mathsf{target}$ domain, where we had no labeled data. The task on both these datasets was the same - to predict similarity between questions. The $\mathsf{source}$ domain in our experiments was the \textit{Ask Ubuntu} dataset, described in the previous section. The $\mathsf{target}$ domain that we wanted to transfer this model to was the \textit{Android stack exchange}, a question-answer site on Android-related issues. Table \ref{tab:dataset} describes the summary statistics of this dataset. For the $\mathsf{target}$ domain, we had XX sentences to test. Each query was expert-annotated with similar and dissimilar queries they corresponded to. No $\mathsf{BM25 scores}$ were provided to evaluate a baseline. Table XX describes the architecture of the encoders and decoders.
+We worked with two datasets, one as our $\mathsf{source}$ domain, wherein we had labeled data and another as our $\mathsf{target}$ domain, where we had no labeled data. The task on both these datasets was the same - to predict similarity between questions. The $\mathsf{source}$ domain in our experiments was the \textit{AskUbuntu} dataset, described in the previous section. The $\mathsf{target}$ domain was the \textit{Android Stack Exchange}, a question-answering site on Android-related issues. Table \ref{tab:dataset} describes the summary statistics of this dataset. For the $\mathsf{target}$ domain, we had {\color{red} XX} sentences to test. Each query was expert-annotated with similar and dissimilar queries they corresponded to. A TF-IDF representation was used as a baseline for evaluating domain adaptation. Table {\color{red} XX} describes the architecture of the encoders and decoders.
 
 \begin{table*}[h]
 \parbox{.55\linewidth}{
@@ -376,9 +378,10 @@ We worked with two datasets, one as our $\mathsf{source}$ domain, wherein we had
 \subsection{Model}
 We model this task of unsupervised domain adaptation using a neural adversarial approach \cite{ganin2015unsupervised}. The core idea is as follows - 
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-    \item We define an encoder which is able to take in the data from the $\mathsf{source}$ domain and learn a representation which predicts the similarity for tasks in its own domain, given that we have labels for this domain. This is similar to the in-domain learning described in the previous section.
-    \item While the primary goal of predicting $\mathcal{Y}_\mathsf{source}$ remains, we define an adversarial objective to guide the direction of the encoded embeddings in a way to make them abstract enough to be able to discriminate $\mathcal{Y}_\mathsf{target}$ as well.
-    \item We do this by setting an objective in the adversarial to predict the label $\mathsf{source}$ or $\mathsf{target}$. If the origin of the input data is being discriminated well by the adversarial network, a negative weight is propagated to the encoder, thereby making the encoding abstract enough to not being able to distinguish between the two domains, while being able to predict $\mathcal{Y}_\mathsf{source}$ well. This ensures the successful transfer of the encoded embeddings to the $\mathsf{target}$ domain. Figure \ref{fig:adversary} depicts this arrangement.
+    \item We define an encoder which takes in data from the $\mathsf{source}$ domain and learns a representation which predicts the similarity for tasks in its own domain, given that we have labels for this domain. This is similar to the in-domain learning described in the previous section. We refer to this network as the \textit{encoder network} here on.
+    \item While the primary goal of predicting $\mathcal{Y}_\mathsf{source}$ remains, we define an adversarial objective to guide the direction of the embeddings encoded by the encoder network in a way to make them abstract enough to be able to discriminate $\mathcal{Y}_\mathsf{target}$ as well.
+    \item We do this by setting up another network to learn this adversarial objective. We refer to this network as \textit{adversarial network} here on. We set the goal of the adversarial network to predict whether a given data-point input to it originates from either the $\mathsf{source}$ or $\mathsf{target}$ dataset. The idea behind setting up this objective is that if the origin of the input data is being discriminated well by the adversarial network, then the features are still specific enough to discriminate between the two datasets. What we want is to however have an abstract enough feature space which, in spite of predicting the labels of the $\mathsf{source}$ well, is unable to distinguish between the $\mathsf{source}$ and $\mathsf{target}$ dataset.
+    \item The objective of the adversarial network is set up in a way to propogate a negative weight to the encoder whenever it successfully discriminates between $\mathsf{source}$ and $\mathsf{target}$. This ensures the successful transfer of the encoded embeddings to the $\mathsf{target}$ domain. Figure \ref{fig:adversary} depicts this arrangement.
 \end{itemize}
 
 
@@ -389,18 +392,20 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
 \caption{Adversarial network for unsupervised domain adaptation investigated in this work. Image reference: Ganin et al., 2015 \protect\cite{ganin2015unsupervised}}
 \end{figure}
     
-\section{Other techniques for DA}
+\section{Exploring Domain Adaptation}
 \label{other_techniques}
-We explored two other techniques to carry out unsupervised domain transfer. We tried out $\textsf{Doc2Vec}$ \cite{doc2vec1} and Siamese recurrent networks \cite{siamese} for domain transfer. We describe each briefly here:
+We explored two other techniques to carry out unsupervised domain transfer - $\textsf{Doc2Vec}$ \cite{doc2vec1} and Siamese recurrent networks \cite{siamese}. We describe each briefly here:
 
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-\item $\mathbf{\mathsf{Doc2Vec}}$ Paragraph vectors, or $\mathsf{doc2vec}$, were proposed by Le and Mikolov (2014) as a simple extension to word2vec to extend the learning of embeddings from words to word sequences. $\mathsf{doc2vec}$ is agnostic to the  granularity of the word sequence — it can equally be a word n-gram, sentence, paragraph or document. In this paper, we use the term ``document embedding'' to refer to the embedding of a word sequence, irrespective of its granularity.
+\item $\mathbf{\mathsf{Doc2Vec}}$ Paragraph vectors, or $\mathsf{doc2vec}$, were proposed by Le and Mikolov (2014) as a simple extension to word2vec to extend the learning of embeddings from words to word sequences. $\mathsf{doc2vec}$ is agnostic to the  granularity of the word sequence — it can equally be a word n-gram, sentence, paragraph or document. In this paper, we use the term ``document embedding'' to refer to the embedding of title and body.
 
 \item \textbf{Siamese networks} 
+{\color{red} TODO}
 
 \end{itemize}
 
-\section{Experiments}
+\section{Experiments and Results}
+
 \label{experiments}
 We pose the following research questions, whose answers we investigate in this work
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
@@ -413,7 +418,8 @@ We pose the following research questions, whose answers we investigate in this w
 \subsection{Experiment 1}
 To answer $\mathbf{E1}$, we measure the performance of our neural encoders against a baseline of $\mathsf{BM25 scores}$ provided for each query in the test set of the corpus. These scores are pre-computed for each query-positive and query-negative pair. The ranked list of these scores per query is used as a baseline performance on the four metrics we choose (see Section \ref{in_domain} for details on the metrics).
 
-\subsubsection{Implementation specifics} In our implementation, we ensure that stop words are removed from the corpus. This reduces the average sentence length by 30\%. Each input in a batch that we pass to our network consists of words in a query, one positive question corresponding to it and all its corresponding negative questions. We pad unseen words in the pre-trained embeddings with 0s. We also equate sentence length in a batch by padding with 0s. The 0-padding is taken into account while mean pooling the intermediate results in the network. We do not train the pre-trained embedding layer. We cap the the number of words in a title and the body. To limit computational requirement, we score only 40 random negative questions per query instead of the full 100 provided in the dataset. All hyperparameters are tuned on the dev set. The number of trainable network parameters are constrained to a budget of 450K parameters so that the expressability of the models are comparable.
+\textbf{Implementation specifics:}
+In our implementation, we ensure that stop words are removed from the corpus. This reduces the average sentence length by 30\%. Each input in a batch that we pass to our network consists of words in a query, one positive question corresponding to it and all its corresponding negative questions. We pad unseen words in the pre-trained embeddings with 0s. We also equate sentence length in a batch by padding with 0s. The 0-padding is taken into account while mean pooling the intermediate results in the network. We do not train the pre-trained embedding layer. In this work, to limit computational requirements, we consider only the first 10 words in the title and the first 100 words in the body of each sentence. Further, we score only 40 random negative questions per query instead of the full 100 provided in the dataset. All hyperparameters are tuned on the dev set. The number of trainable network parameters are constrained to a budget of 450K parameters so that the expressability of the models are comparable.
 
 \begin{table*}[h]
     \centering
@@ -508,24 +514,29 @@ To answer $\mathbf{E1}$, we measure the performance of our neural encoders again
 
 
 \subsection{Experiment 2} 
-To answer $\mathbf{E2}$, we measure the performance of domain adaptation on the \textit{Android Stack Exchange} dataset, having learnt a model on the \textit{Ask Ubuntu} dataset. 
-\subsubsection{Evaluation} The evaluation metric for this task is changed to instead evaluate a binary classification task - is a query similar to a given candidate question present in the corpus or not. As a consequence, the robustness of the system is measured using a $AUC(0.05)$ score. This particular choice of evaluation metric is different from those used in $\mathbf{E1}$, primarily because of the way the designers of this problem statement have designed it. To make a fair comparison with the previous methods, results from $\mathbf{E1}$ would also need to be brought to the same scale.
+To answer $\mathbf{E2}$, we measure the performance of domain adaptation on the \textit{Android Stack Exchange} dataset, having learnt a model on the \textit{Ask Ubuntu} dataset.
 
-\subsubsection{Baselines} We establish multiple baselines - some stronger than the other. To begin with, we train a TF-IDF model on the $\textsf{source}$ domain and evaluate on the $\textsf{target}$ domain. As a slightly stronger baseline, we directly apply the model learnt in $\mathbf{E1}$ onto the $\textsf{target}$ domain.
+\textbf{Evaluation:} The evaluation metric for this task is changed to instead evaluate a binary classification task - is a query similar to a given candidate question present in the corpus or not. As a consequence, the robustness of the system is measured using a $AUC(0.05)$ score. This designers of this problem statement chose this different metric compared to those used in $\mathbf{E1}$. This makes comparing results between the two experiments hard.
 
-\subsubsection{Implementation specifics} We train the encoder network from scratch to train the two objectives detailed in Section \ref{domain_adapt}. We maintain the constraint of evaluating on 40 negative samples for the $\mathsf{source}$ label classifier but do not vary the validation/test set for the $\mathsf{target}$ domain. We maintain the same constraints on the length of the title and body as in $\mathbf{E1}$. Stop-words and word-casing are handled for the $\mathsf{target}$ domain. We evaluate the system on both, pre-trained embeddings used in $\mathbf{E1}$ and off-the-shelf $\mathsf{GloVe}$ embeddings \cite{pennington2014glove}. All hyperparameters are tuned on the dev set.
+\textbf{Baselines:} We establish multiple baselines - some stronger than the other. To begin with, we train a TF-IDF model on the $\textsf{source}$ domain and evaluate on the $\textsf{target}$ domain. As a slightly stronger baseline, we directly apply the model learnt in $\mathbf{E1}$ onto the $\textsf{target}$ domain.
+
+\textbf{Implementation specifics:} We train the encoder network from scratch to train the two objectives detailed in Section \ref{domain_adapt}. We maintain the constraint of evaluating on 40 negative samples for the $\mathsf{source}$ label classifier but do not vary the validation/test set for the $\mathsf{target}$ domain. We maintain the same constraints on the length of the title and body as in $\mathbf{E1}$. Stop-words and word-casing are handled for the $\mathsf{target}$ domain. We evaluate the system on both, pre-trained embeddings used in $\mathbf{E1}$ and off-the-shelf $\mathsf{GloVe}$ embeddings \cite{pennington2014glove}. All hyperparameters are tuned on the dev set.
 
 \subsection{Experiment 3}
+{\color{red} TODO}
 
 \subsection{Experiment 4}
+{\color{red} TODO}
 
 \section{Results}
+{\color{red} To merge this section with the one above, i.e. just have one: experimental results}
 We analyze the results of each of our four experiments.
 \subsection{Experiment 1}
 Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of question retrieval and similiarity. We denote
 
 \section{Discussion}
 \label{discussion}
+{\color{red}TODO: add adversarial training objectives, discuss stability of changing lambda, discuss differences with siamese networks etc.}
 
 %ACKNOWLEDGEMENTS are optional
 \section{Acknowledgements}
