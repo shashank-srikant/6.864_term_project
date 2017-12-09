@@ -20,6 +20,7 @@
 \usepackage{multirow, array}
 \usepackage{makecell}
 \usepackage[table,x11names]{xcolor}
+\usepackage{color}
 \usepackage{enumitem}
 
 \begin{document}
@@ -78,7 +79,7 @@
 \date{30 July 1999}
 \maketitle
 \begin{abstract}
-Content on the internet grows at an exponential rate. Given this growth, finding relevant information accurately becomes a critical task for the NLP community to address. More so, with this rapid growth, curating labeled datasets to build models for the wide variety of content available on the internet has become extremely time and resource intensive. In this work, we explore whether neural models are able to successfully model content similarity and retrieval tasks, and whether they can transfer knowledge from one domain, where supervised labels are available, to a domain with no available labels. Specifically, we explore content similarity in online discussion forums, where we explore the following questions - a. how effectively can neural approaches model question-answer retrieval tasks, which is, given a question and answer pair present on an online discussion forum, how effectively can neural approaches find similar pairs on that forum. b. Given a model of question-answer similarity in one online discussion forum, how effective are neural approaches in transferring that knowledge to a new, loosely related domain. In this work, we explore a baseline approach of modeling question similarity tasks on the popular online community  \textit{AskUbuntu}. We show how neural architectures like LSTMs and CNNs outperform traditional approaches in information retrieval. Additionally, and importantly, we explore the problem of transferring these models to detect question-answer similarity on \textit{Android stack exchange},  a similar yet different online discussion community which discusses Android related problems. We show how neural domain adaptation techniques successfully beat baseline IR techniques and direct neural transfer techniques. We also discuss some limitations and challenges in using such architectures.
+Content on the internet grows at an exponential rate. Given this growth, finding relevant information accurately becomes a critical task for the NLP community to address. More so, with this rapid growth, curating labeled datasets to build models for the wide variety of content available on the internet has become extremely time and resource intensive. In this work, we explore whether neural models are able to successfully model content similarity and retrieval tasks, and whether they can transfer knowledge from one domain, where supervised labels are available, to a domain with no available labels. Specifically, we explore content similarity in online discussion forums, where we explore the following questions - a. how effectively can neural approaches model question-answer retrieval tasks, which is, given a question and answer pair present on an online discussion forum, how effectively can neural approaches find similar pairs on that forum. b. Given a model of question-answer similarity in one online discussion forum, how effective are neural approaches in transferring that knowledge to a new, loosely related domain. In this work, we explore a baseline approach of modeling question similarity tasks on the popular Stack Exchange online community \textit{Ask Ubuntu}. We show how neural architectures like LSTMs and CNNs outperform traditional approaches in information retrieval. Additionally, and importantly, we explore the problem of transferring these models to detect question-answer similarity on \textit{Android Stack Exchange},  a similar yet different online discussion community where members troubleshoot Android related problems. We show how neural domain adaptation techniques successfully beat baseline IR techniques and direct neural transfer techniques. We also discuss some limitations and challenges in using such architectures.
 \end{abstract}
 
 \begin{table*}[th]
@@ -87,17 +88,17 @@ Content on the internet grows at an exponential rate. Given this growth, finding
 \toprule
 \textbf{Scenario} & \textbf{Setting} & \textbf{Nature of Data} & \textbf{Learning Paradigm} & \textbf{Main Concepts}  \\
 \toprule 
- \makecell{$\mathcal{D}_S = \mathcal{D}_T,$\\$ T_S = T_T$}
+ \makecell{$\mathcal{D}_S = \mathcal{D}_T,$\\$ \mathcal{T}_S = \mathcal{T}_T$}
 & Traditional Machine learning
 & Labelled data in source domain(s) and unlabeled data in target domain
 & Source and target domains are exactly the same
 & Learn models on training set and test on future unseen data \\
 \cmidrule{1-5}
- \multirow{2}{\linewidth}{\textbf{\makecell{$\mathcal{D}_S \neq \mathcal{D}_T$,\\ $T_S = T_T$}}} 
+ \multirow{2}{\linewidth}{\textbf{\makecell{$\mathcal{D}_S \neq \mathcal{D}_T$,\\ $\mathcal{T}_S = \mathcal{T}_T$}}} 
 & \multirow{2}{\linewidth}{Transductive Transfer Learning}
 & \multirow{2}{\linewidth}{Labelled data in source domain(s) and unlabeled data from $\mathcal{P}(X_S) \neq \mathcal{P}(X_T$)}
-& Single source domain adaptation
-\cellcolor{blue!25}
+& \textbf{Single source domain adaptation}
+%\cellcolor{blue!25}
 & Learning common shared representation; instance weighing, parameter transfer
 \\
 \cmidrule{4-5}
@@ -109,7 +110,7 @@ Content on the internet grows at an exponential rate. Given this growth, finding
 \cmidrule{1-5} 
 
 \multirow{2}{\linewidth}{No conditions on $\mathcal{D}_S$, $\mathcal{D}_T$, 
-but $T_S \neq T_T$ }
+but $\mathcal{T}_S \neq \mathcal{T}_T$ }
 & \multirow{2}{\linewidth}{Inductive Transfer Learning}
 & Unlabeled data in source domain(s) and labeled data in target domain
 & Self-taught learning
@@ -120,7 +121,7 @@ but $T_S \neq T_T$ }
 & Multi-task learning
 & Simultaneously learns multiple tasks within (or across) domain(s) by exploiting the common feature subspace shared across the tasks \\
 \cmidrule{1-5}
-\makecell{$\mathcal{D}_S\neq \mathcal{D}_T$\\$T_S \neq T_T$}
+\makecell{$\mathcal{D}_S\neq \mathcal{D}_T$\\$\mathcal{T}_S \neq \mathcal{T}_T$}
 & Kim et al., 2015 \cite{kim2015new}
 & Labeled data in source and target domains
 & Transfer learning with disparate label set
@@ -128,7 +129,7 @@ but $T_S \neq T_T$ }
 \\
 \bottomrule
 \end{tabular*}
-\caption {A brief summary of different transfer learning approaches. The cell marked in blue highlights the approach explored in this work. This summary is based on the work detailed in the survey paper by Pan et. al.\protect\cite{pan2010survey}}
+\caption {A brief summary of different transfer learning approaches. $\mathcal{D}$ is the domain and $\mathcal{T}$ is the task. The boldfaced cell highlights the approach explored in this work. This summary is based on the work detailed in the survey paper by Pan et. al.\protect\cite{pan2010survey}}
 \label{tab:related_work}
 \end{table*}
 
@@ -137,13 +138,13 @@ The problem of text similarity, and specifically, similarity of short queries or
 
 Another relevant and pressing concern which such an explosion and variety of content has introduced is the increased cost of building predictive NLP, NLU models which cater to such content. The variety in content requires building a model from scratch, irrespective of how closely related the content may have been to a previously built model. For instance, if we were to model the reviews written for movies, we would have to reinvest effort and time in modeling reviews written for another domain, say, food or hotels. In spite there being conceptual, semantic similarities between the tasks of reviewing movies and reviewing food, models have to be created anew. And each such modeling exercise demands a large repository of curated, preferably labeled data, which most often is not feasible to put together. The pressing challenge such a variety of content has created is to be able to learn with minimal supervision, and from loosely related datasets.
 
-In this work, we investigate two problems - one, to model question-similarity tasks using state of the art techniques in neural modeling and two, transfer those models to a loosely related, yet equally rich domain under the constraint of having no supervised information on that new domain. Specifically, we explore the problem of finding similar question-answer pairs on the popular online discussion \textit{AskUbuntu}.\footnote{https://askubuntu.com} This discussion forum focuses on troubleshooting queries on Ubuntu, the popular open-source operating system. In addition to  learning models to find relevant question-answer pairs on this forum, we also use this domain to transfer knowledge onto modeling question-answer similarity in \textit{Android stack exchange}.\footnote{https://android.stackexchange.com} This is an online community, similar in setup and structure to \textit{AskUbuntu}, wherein short queries and corresponding answers on Android-related troubleshooting are present.
+In this work, we investigate two problems - one, to model question-similarity tasks using state of the art techniques in neural modeling and two, transfer those models to a loosely related, yet equally rich domain under the constraint of having no supervised information on that new domain. Specifically, we explore the problem of finding similar question-answer pairs on the popular \textit{Ask Ubuntu Stack Exchange}.\footnote{https://askubuntu.com} This discussion forum focuses on troubleshooting queries on Ubuntu, the popular open-source operating system. In addition to  learning models to find relevant question-answer pairs on this forum, we also use this domain to transfer knowledge onto modeling question-answer similarity in \textit{Android Stack Exchange}.\footnote{https://android.stackexchange.com} This is an online community, similar in setup and structure to \textit{Ask Ubuntu}, wherein short queries and corresponding answers on Android-related troubleshooting are present.
 
-In this work, we investigate how state of the art neural architectures for NLP applications perform on the task of question similarity. Traditionally, text similarity tasks were solved using information retrieval techniques like building an indexer and applying ABC and ABC, which consider XYZ. We study how more recent techniques like RNNs and CNNs, which have shown to successfully model text on tasks like XYZ, model this particular task. For the domain adaptation task of learning question similarity in {Android stack exchange}, we explore adversarial neural techniques, and Doc2Vec \cite{REF} in learning from the \textit{Ask Ubuntu} dataset. 
+In this work, we investigate how state of the art neural architectures for NLP applications perform on the task of question similarity. Traditionally, text similarity tasks were solved using information retrieval techniques like building an indexer and applying {\color{red}ABC and ABC, which consider XYZ}. We study how more recent techniques like RNNs and CNNs, which have shown to successfully model a variety of NLP tasks, solve the question retrieval problem. For the domain adaptation task, we explore adversarial training techniques \cite{ganin2015unsupervised, lei2015semi} as well as the performance on different architectures like $\textsf{Doc2Vec}$ \cite{doc2vec1} and Siamese neural networks \cite{siamese}.
 
-The study demonstrates the relevance of neural techniques in a critical NLP task like question-answer retrieval. We demonstrate how using neural approaches, one can outperform traditional information retrieval techniques while not having to invest heavily in engineering the right features to get to such a performance. Additionally, we show the successful transfer of domain knowledge from one domain to another using state of the art neural transfer techniques.
+This study demonstrates the relevance of neural techniques in a critical NLP task like question-answer retrieval. We demonstrate how using neural approaches, one can outperform traditional information retrieval techniques while not having to invest heavily in engineering the right features to get to such performance. Additionally, we show the successful transfer of domain knowledge from one domain to another using state of the art neural transfer techniques.
 
-This work is organized into the following sections - Section \ref{related} discusses related work in this field. Sections \ref{in_domain}, \ref{domain_adapt},  \ref{other_techniques} discuss the various techniques to model in-domain and domain adaptation tasks for the given problem. Section \ref{experiments} discusses the experiment setup and the results. Section \ref{discussion} discusses the results and concludes our work.
+This work is organized into the following sections - Section \ref{related} discusses related work in this field. Sections \ref{in_domain}, \ref{domain_adapt},  \ref{other_techniques} discuss various techniques to model in-domain and domain adaptation tasks for the given problem. Section \ref{experiments} discusses the experiment setup and the results. Section \ref{discussion} concludes our work.
 
 
 \begin{figure*}[h]
@@ -163,16 +164,16 @@ This work is organized into the following sections - Section \ref{related} discu
 \label{related}
 Given the growing popularity of community QA forums, question retrieval has emerged as an important area of research. Recent work has also gone beyond word-based methods to represent this task. For instance, Feng et. al. \cite{feng2015applying} learn word embeddings using category-based metadata information for questions. They define each question as a distribution which generates each word (embedding) independently, and subsequently use a Fisher kernel to assess question similarities. Dos Santos et. al. \cite{dos2015learning} propose an approach which combines a convolutional neural network (CNN) and a bag of words representation for comparing questions. In contrast to \cite{feng2015applying}, Lei et. al. \cite{lei2015semi} treat each question as a word sequence as opposed to a bag of words, and apply recurrent CNNs instead of traditional CNNs. We base our work on \cite{lei2015semi}. We apply different off-the-shelf deep learning models to encode a meaningful embedding and define similarity over these embeddings.
 
-Domain adaptation has been an active area of research in NLP. Table \ref{tab:related_work}  summarizes different settings of transfer learning \cite{pan2010survey}. Our work explores techniques in unsupervised domain adaptation, which operates when the source and target domains ($\mathcal{D}$) are different, but share a common task ($T_i$) to achieve. It helps understand where this approach lies in the spectrum of techniques. 
+Domain adaptation has been an active area of research in NLP. Table \ref{tab:related_work}  summarizes different settings of transfer learning \cite{pan2010survey}. Our work explores techniques in unsupervised domain adaptation, where the source and target domains ($\mathcal{D}$) are different, but share a common task ($T$) to achieve. The summary helps in understanding where our approach lies in this spectrum of techniques.
 
 We study in this work the scenario where the domains vary while the tasks remain the same. This is referred to as transductive transfer learning. This is the most extensively studied settings in the transfer learning literature and can be broadly categorized as single and multi-source adaptation. Single source adaptation\cite{chen2009extracting, ando2005framework, daume2009frustratingly} primarily aims at minimizing the divergence between the source and target domains either at instance or feature levels. The general idea being identifying a suitable low dimensional space where transformed source and target domains data follow similar distributions and hence, a standard supervised learning algorithm can be trained.
 
-Multiple methods perform unsupervised domain adaptation by matching the feature distributions in the source and the target domains. Some approaches perform this by reweighing or selecting samples from the source domain  \cite{borgwardt2006integrating, huang2007correcting, gong2012geodesic}, while others seek an explicit feature space transformation that would map source distribution into the target ones \cite{pan2011domain, gopalan2011domain, baktashmotlagh2013unsupervised}. An important  aspect of the distribution matching approach is the way the (dis)similarity between distributions is measured. Here, one popular choice is matching the distribution means in the kernel-reproducing Hilbert space \cite{borgwardt2006integrating, huang2007correcting}, whereas \cite{gong2012geodesic, fernando2013unsupervised} map the principal axes associated with each of the distributions. The approach explored in this work is based on \cite{ganin2015unsupervised} and also attempts to match feature space distributions, however this is accomplished by modifying the feature representation itself rather than by reweighing or geometric transformation. Also, the method used to measure the disparity between distributions based on their separability is implicitly different and is done by a deep discriminatively-trained classifier.
+Multiple methods perform unsupervised domain adaptation by matching the feature distributions in the source and the target domains. Some approaches perform this by reweighing or selecting samples from the source domain  \cite{borgwardt2006integrating, huang2007correcting, gong2012geodesic}, while others seek an explicit feature space transformation that would map source distribution into the target ones \cite{pan2011domain, gopalan2011domain, baktashmotlagh2013unsupervised}. An important  aspect of the distribution matching approach is the way the (dis)similarity between distributions is measured. Here, one popular choice is matching the distribution means in the kernel-reproducing Hilbert space \cite{borgwardt2006integrating, huang2007correcting}, whereas \cite{gong2012geodesic, fernando2013unsupervised} map the principal axes associated with each of the distributions. The approach explored in this work is based on \cite{ganin2015unsupervised} and also attempts to match feature space distributions. However, this is accomplished by modifying the feature representation itself rather than by reweighing or geometric transformation. Also, the method used to measure the disparity between distributions based on their separability is implicitly different and is done by a deep discriminatively-trained classifier in our work as.
 
 
 \section{In-domain Question similarity}
 \label{in_domain}
-We first explore the task of question similarity by training a domain-specific classifier. The domain we have explored in this work involves the questions and answers asked on \textit{AskUbuntu}, a popular online discussion forum where the community troubleshoots problems related to Ubuntu, the operating system. The dataset for this task was curated by \cite{lei2015semi}. 
+We first explore the task of question similarity by training a domain-specific classifier. The domain we have explored in this work involves the questions and answers asked on \textit{Ask Ubuntu}. The dataset for this task was curated by \cite{lei2015semi}. 
 
 \begin{table}[h]
 \begin{tabular}{l|r|r}
@@ -182,7 +183,7 @@ We first explore the task of question similarity by training a domain-specific c
      \\
      \toprule
      Description
-     & \textit{Ask Ubuntu}
+     & \textit{AskUbuntu}
      & \textit{Android SE}
      \\
      \# of sentences
@@ -208,12 +209,12 @@ We first explore the task of question similarity by training a domain-specific c
 \subsection{Dataset}
 We describe here the dataset that we base our work on.
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-\item The \textit{Ask Ubuntu} dataset consists of question and answers related to problems people face in Ubuntu, the operating system
-\item Each query has two components - a title and main body. The average title length is XX words and the average body length is YY words long. Figure \ref{fig:len_hist} shows the distribution of word lengths.
-\item In this work, to limit computational requirement, we consider only the first XX words in the title and the first YY words in the body of each sentence.
-\item The \textit{Ask Ubuntu} platform has a section where users flag similar questions. We use that as a weak signal to inform our true labels, since these user-flagged suggestions are not complete and suffer from high recall issues.
-\item In order to train our classifiers with dissimilar pairs of questions, each query is also associated with randomly drawn queries from the sample.
-\item We trained on roughly 110,000 query-answer pairs to train our in-domain classifier.
+\item The \textit{AskUbuntu} dataset consists of question and answers related to problems people face in Ubuntu, the operating system
+\item Each query has two components - a title and main body. The average title length is {\color{red} XX} words and the average body length is {\color{red} YY words} long. Figure \ref{fig:len_hist} shows the distribution of word lengths.
+\item In this work, to limit computational requirements, we consider only the first 10 words in the title and the first 100 words in the body of each sentence.
+\item The \textit{AskUbuntu} platform has a section where users flag similar questions. We use that as a weak signal to inform our true labels, since these user-flagged suggestions are not complete and suffer from high recall issues.
+\item Each query is associated with $40$ randomly drawn dis-similar examples.
+\item We trained on 110K queries, where for each query we had $1$ positive (similar) and $100$ negative (dissimilar) examples provided in the dataset.
 \item In the test set, for each pair of similar and dissimilar questions, we are also given the $\mathsf{BM25 scores}$, their similarity as measured by an industrial IR-system. These serve as a baseline for all our experiments.
 \end{itemize}
 
@@ -231,6 +232,7 @@ We model the task of in-domain question similarity as follows:
 where $\delta(.,.)$ denotes a non-negative margin. We set $\delta(p, p^+_i)$ to be a small constant when $p \neq p^+_i$ and 0 otherwise. The parameters $\theta$ can be optimized through sub-gradients ${\partial L}/{\partial \theta}$ aggregated over small batches of the training instances \cite{lei2015semi}.
   \item The neural network essentially serves as an encoder to generate a representation in a low-dimension space which encodes the loss function $L(.)$ defined above.
   \item In this work, we implement two neural networks, LSTMs and CNNs, as these encoders.
+  \item Similarity is evaluated on standard information retrieval metrics like \textit{Precision@1}, \textit{Precision@5}, \textit{Mean Average Precision}, and \textit{Mean Reciprocal Rank}. The inputs to each of these metrics is a ranked list of numbers. We pass in the cosine similarity scores obtained between the query and each of the positive and negative questions associated with that query, as our ranked list. The $\mathsf{bm25 scores}$ for each of these pairs is used as a baseline similarity score and their evaluations on the metrics mentioned above are considered the baseline performance indicators for this approach.
 \end{itemize}
 
 \begin{table}[h]
@@ -389,10 +391,10 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
     
 \section{Other techniques for DA}
 \label{other_techniques}
-We explored two other techniques to carry out unsupervised domain transfer. We tried out Doc2Vec \cite{doc2vec1} and Siamese recurrent networks \cite{siamese} for domain transfer. We describe each briefly here:
+We explored two other techniques to carry out unsupervised domain transfer. We tried out $\textsf{Doc2Vec}$ \cite{doc2vec1} and Siamese recurrent networks \cite{siamese} for domain transfer. We describe each briefly here:
 
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-\item \textbf{Doc2Vec} Paragraph vectors, or $\mathsf{doc2vec}$, were proposed by Le and Mikolov (2014) as a simple extension to word2vec to extend the learning of embeddings from words to word sequences. $\mathsf{doc2vec}$ is agnostic to the  granularity of the word sequence — it can equally be a word n-gram, sentence, paragraph or document. In this paper, we use the term ``document embedding'' to refer to the embedding of a word sequence, irrespective of its granularity.
+\item $\mathbf{\mathsf{Doc2Vec}}$ Paragraph vectors, or $\mathsf{doc2vec}$, were proposed by Le and Mikolov (2014) as a simple extension to word2vec to extend the learning of embeddings from words to word sequences. $\mathsf{doc2vec}$ is agnostic to the  granularity of the word sequence — it can equally be a word n-gram, sentence, paragraph or document. In this paper, we use the term ``document embedding'' to refer to the embedding of a word sequence, irrespective of its granularity.
 
 \item \textbf{Siamese networks} 
 
@@ -409,12 +411,118 @@ We pose the following research questions, whose answers we investigate in this w
 \end{itemize}
 
 \subsection{Experiment 1}
-To answer $E1$, we measure the performance of our neural encoders against of $\mathsf{BM25 scores}$ provided for the test set of the corpus. The metrics we compare on 
-\subsection{Experiment 2}
+To answer $\mathbf{E1}$, we measure the performance of our neural encoders against a baseline of $\mathsf{BM25 scores}$ provided for each query in the test set of the corpus. These scores are pre-computed for each query-positive and query-negative pair. The ranked list of these scores per query is used as a baseline performance on the four metrics we choose (see Section \ref{in_domain} for details on the metrics).
+
+\subsubsection{Implementation specifics} In our implementation, we ensure that stop words are removed from the corpus. This reduces the average sentence length by 30\%. Each input in a batch that we pass to our network consists of words in a query, one positive question corresponding to it and all its corresponding negative questions. We pad unseen words in the pre-trained embeddings with 0s. We also equate sentence length in a batch by padding with 0s. The 0-padding is taken into account while mean pooling the intermediate results in the network. We do not train the pre-trained embedding layer. We cap the the number of words in a title and the body. To limit computational requirement, we score only 40 random negative questions per query instead of the full 100 provided in the dataset. All hyperparameters are tuned on the dev set. The number of trainable network parameters are constrained to a budget of 450K parameters so that the expressability of the models are comparable.
+
+\begin{table*}[h]
+    \centering
+    \begin{tabular}{r | c | r r r r | r r r r}
+         Model name
+         & \# of parameters in the n/w
+         & \multicolumn{4}{c|}{Test}
+         & \multicolumn{4}{c}{Dev}
+         \\
+         \toprule
+         BM25 baseline
+         & NA
+         & 0.68
+         & 0.54
+         & 0.42
+         & 0.56
+         & 0.66
+         & 0.52
+         & 0.42
+         & 0.52
+         \\
+         \midrule
+         CNN
+         & 337290
+         & 0.63
+         & 0.48
+         & 0.40
+         & 0.43
+         & 0.63
+         & 0.49
+         & 0.41
+         & 0.51
+         \\
+         \midrule
+         LSTM
+         & 337290
+         & 0.69
+         & 0.54
+         & 0.42
+         & 0.56
+         & 0.65
+         & 0.48
+         & 0.44
+         & 0.54
+         
+    \end{tabular}
+    \caption{Results for Experiment 1 - In-domain learning using neural models}
+    \label{tab:exp1}
+    
+    
+    \centering
+    \begin{tabular}{r | c | r r}
+    Model name
+    & Description
+    & AUC(0.05) - Test
+    & AUC(0.05) - Val
+    \\
+    \toprule
+    TF-IDF
+    & Baseline
+    & 0.58
+    & 0.58
+    \\
+    \midrule
+    CNN-Direct
+    & \multirow{2}{*}{Direct transfer}
+    & 0.62
+    & 0.62
+    \\
+    
+    LSTM-direct
+    & 
+    & 0.62
+    & 0.63
+    \\
+    \midrule
+    CNN-adv
+    & \multirow{2}{*}{Adversarial domain transfer}
+    & 0.70
+    & 0.70
+    \\
+    
+    LSTM-adv
+    &
+    & 0.70
+    & 0.70
+    \\
+    \bottomrule
+    \end{tabular}
+    
+\end{table*}
+
+
+\subsection{Experiment 2} 
+To answer $\mathbf{E2}$, we measure the performance of domain adaptation on the \textit{Android Stack Exchange} dataset, having learnt a model on the \textit{Ask Ubuntu} dataset. 
+\subsubsection{Evaluation} The evaluation metric for this task is changed to instead evaluate a binary classification task - is a query similar to a given candidate question present in the corpus or not. As a consequence, the robustness of the system is measured using a $AUC(0.05)$ score. This particular choice of evaluation metric is different from those used in $\mathbf{E1}$, primarily because of the way the designers of this problem statement have designed it. To make a fair comparison with the previous methods, results from $\mathbf{E1}$ would also need to be brought to the same scale.
+
+\subsubsection{Baselines} We establish multiple baselines - some stronger than the other. To begin with, we train a TF-IDF model on the $\textsf{source}$ domain and evaluate on the $\textsf{target}$ domain. As a slightly stronger baseline, we directly apply the model learnt in $\mathbf{E1}$ onto the $\textsf{target}$ domain.
+
+\subsubsection{Implementation specifics} We train the encoder network from scratch to train the two objectives detailed in Section \ref{domain_adapt}. We maintain the constraint of evaluating on 40 negative samples for the $\mathsf{source}$ label classifier but do not vary the validation/test set for the $\mathsf{target}$ domain. We maintain the same constraints on the length of the title and body as in $\mathbf{E1}$. Stop-words and word-casing are handled for the $\mathsf{target}$ domain. We evaluate the system on both, pre-trained embeddings used in $\mathbf{E1}$ and off-the-shelf $\mathsf{GloVe}$ embeddings \cite{pennington2014glove}. All hyperparameters are tuned on the dev set.
+
 \subsection{Experiment 3}
+
 \subsection{Experiment 4}
 
 \section{Results}
+We analyze the results of each of our four experiments.
+\subsection{Experiment 1}
+Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of question retrieval and similiarity. We denote
 
 \section{Discussion}
 \label{discussion}
