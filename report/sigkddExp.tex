@@ -155,8 +155,8 @@ This work is organized into the following sections - Section \ref{related} discu
     \includegraphics[width=\columnwidth]{img/question_len_hist}
 &   \includegraphics[width=\columnwidth]{img/similar}
 \\
-   \includegraphics[width=\columnwidth]{img/adversary}
-&   \includegraphics[width=\columnwidth]{img/question_len_hist}
+   \includegraphics[width=\columnwidth]{img/cnn}
+&   \includegraphics[width=\columnwidth]{img/cnn}
 \end{tabular}
 \label{fig:len_hist}
 \caption{Summary of the \textit{Ask Ubuntu} dataset}
@@ -367,7 +367,7 @@ Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of
 \subsection{Experiment 2} 
 To answer $\mathbf{E2}$, we measure the performance of domain adaptation on the \textit{Android Stack Exchange} dataset, having learnt a model on the \textit{Ask Ubuntu} dataset.
 
-\textbf{Evaluation:} The evaluation metric for this task is changed to instead evaluate a binary classification task - is a query similar to a given candidate question present in the corpus or not. As a consequence, the robustness of the system is measured using a $AUC(0.05)$ score. This designers of this problem statement chose this different metric compared to those used in $\mathbf{E1}$. This makes comparing results between the two experiments hard.
+\textbf{Evaluation:} The evaluation metric for this task is changed to instead evaluate a binary classification task - is a query similar to a given candidate question present in the corpus or not. As a consequence, the robustness of the system is measured using a $AUC(0.05)$ score. Since the metric to evaluate the two experiments are different, we do not compare the performance across experiments.
 
 \textbf{Baselines:} We establish multiple baselines - some stronger than the other. To begin with, we train a TF-IDF model on the $\textsf{source}$ domain and evaluate on the $\textsf{target}$ domain. As a slightly stronger baseline, we directly apply the model learnt in $\mathbf{E1}$ onto the $\textsf{target}$ domain.
 
