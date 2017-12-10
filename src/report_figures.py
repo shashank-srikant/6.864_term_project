@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 import ConfigParser
 import cPickle as pickle
+from sklearn.metrics import roc_curve
 
 config = ConfigParser.ConfigParser()
 config.readfp(open(r'config.ini'))
@@ -55,6 +56,7 @@ with open(filename) as f:
 
 
 #generate plots
+"""
 plt.figure()
 plt.plot(figures_lstm['lstm_training_loss'], c='r', lw=2.0, label='LSTM')
 plt.plot(figures_cnn['cnn_training_loss'], c='b', lw=2.0, label='CNN')
@@ -100,13 +102,53 @@ ax1.set_title('ranking performance')
 ax1.set_ylabel('dev')
 ax2.set_ylabel('test')
 plt.savefig('../figures/report_ranking_performance.png')
+"""
+
+fpr_da_tfidf, tpr_da_tfidf, _ = roc_curve(figures_da_tfidf['tfidf_ytrue'], figures_da_tfidf['tfidf_ypred'])
+fpr_da_lstm_direct, tpr_da_lstm_direct, _ = roc_curve(figures_da_lstm_direct['lstm_direct_ytrue'], figures_da_lstm_direct['lstm_direct_ypred'])
+fpr_da_cnn_direct, tpr_da_cnn_direct, _ = roc_curve(figures_da_cnn_direct['cnn_direct_ytrue'], figures_da_cnn_direct['cnn_direct_ypred'])
 
 
+plt.figure()
+plt.plot(fpr_da_tfidf, tpr_da_tfidf, c='k', lw=2.0, label='TF-IDF (AUC = %0.2f)' % figures_da_tfidf['tfidf_roc_auc'])
+plt.plot(fpr_da_lstm_direct, tpr_da_lstm_direct, c='r', lw=2.0, label='LSTM (AUC = %0.2f)' % figures_da_lstm_direct['lstm_direct_roc_auc'])
+plt.plot(fpr_da_cnn_direct, tpr_da_cnn_direct, c='b', lw=2.0, label='CNN (AUC = %0.2f)' % figures_da_cnn_direct['cnn_direct_roc_auc'])
+plt.plot([0, 1], [0, 1], c='k', lw=2.0, linestyle='--')
+plt.title('Direct Domain Transfer')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend(loc="lower right")
+plt.savefig('../figures/report_da_roc_direct.png')
 
 
+fpr_da_lstm_adversarial, tpr_da_lstm_adversarial, _ = roc_curve(figures_da_lstm_adversarial['lstm_adversarial_ytrue'], figures_da_lstm_adversarial['lstm_adversarial_ypred'])
+fpr_da_cnn_adversarial, tpr_da_cnn_adversarial, _ = roc_curve(figures_da_cnn_adversarial['cnn_adversarial_ytrue'], figures_da_cnn_adversarial['cnn_adversarial_ypred'])
+
+plt.figure()
+plt.plot(fpr_da_lstm_adversarial, tpr_da_lstm_adversarial, c='r', lw=2.0, label='LSTM (AUC = %0.2f)' % figures_da_lstm_adversarial['lstm_adversarial_roc_auc'])
+plt.plot(fpr_da_cnn_adversarial, tpr_da_cnn_adversarial, c='b', lw=2.0, label='CNN (AUC = %0.2f)' % figures_da_cnn_adversarial['cnn_adversarial_roc_auc'])
+plt.plot([0, 1], [0, 1], c='k', lw=2.0, linestyle='--')
+plt.title('Adversarial Domain Transfer')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend(loc="lower right")
+plt.savefig('../figures/report_da_roc_adversarial.png')
 
 
+fpr_da_doc2vec_dm, tpr_da_doc2vec_dm, _ = roc_curve(figures_da_doc2vec_dm['doc2vec_ytrue'], figures_da_doc2vec_dm['doc2vec_ypred'])
+fpr_da_doc2vec_dbow, tpr_da_doc2vec_dbow, _ = roc_curve(figures_da_doc2vec_dbow['doc2vec_ytrue'], figures_da_doc2vec_dbow['doc2vec_ypred'])
+fpr_da_siamese, tpr_da_siamese, _ = roc_curve(figures_da_siamese['siamese_ytrue'], figures_da_siamese['siamese_ypred'])
 
+plt.figure()
+plt.plot(fpr_da_doc2vec_dm, tpr_da_doc2vec_dm, c='r', lw=2.0, label='Doc2Vec DM (AUC = %0.2f)' % figures_da_doc2vec_dm['doc2vec_roc_auc'])
+plt.plot(fpr_da_doc2vec_dbow, tpr_da_doc2vec_dbow, c='b', lw=2.0, label='Doc2Vec DBOW (AUC = %0.2f)' % figures_da_doc2vec_dbow['doc2vec_roc_auc'])
+plt.plot(fpr_da_siamese, tpr_da_siamese, c='k', lw=2.0, label='SIAMESE RNN (AUC = %0.2f)' % figures_da_siamese['siamese_roc_auc'])
+plt.plot([0, 1], [0, 1], c='k', lw=2.0, linestyle='--')
+plt.title('Direct Domain Transfer')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend(loc="lower right")
+plt.savefig('../figures/report_da_roc_part3.png')
 
 
 
