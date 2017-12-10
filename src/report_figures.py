@@ -72,7 +72,6 @@ plt.ylabel("Learning rate")
 plt.legend()
 plt.savefig('../figures/report_learning_rate_schedule.png')
 
-f, (ax1, ax2) = plt.subplots(2, 1, figsize=(8,6), sharex=True)
 xlabels = ['value', 'metric', 'model']
 ranking_metrics_val_df = pd.DataFrame(columns = xlabels)
 ranking_metrics_val_df.loc[0, :] = [figures_lstm['lstm_map_val'][0], 'MAP', 'LSTM (dev)']
@@ -94,7 +93,7 @@ ranking_metrics_test_df.loc[5, :] = [figures_cnn['cnn_mrr_test'][0], 'MRR', 'CNN
 ranking_metrics_test_df.loc[6, :] = [figures_cnn['cnn_pr1_test'][0], 'P@1', 'CNN (test)']
 ranking_metrics_test_df.loc[7, :] = [figures_cnn['cnn_pr5_test'][0], 'P@5', 'CNN (test)']
 
-plt.figure()
+f, (ax1, ax2) = plt.subplots(2, 1, figsize=(8,6), sharex=True)
 sns.barplot(x='metric', y='value', hue='model', data=ranking_metrics_val_df, palette='Reds', ax=ax1)
 sns.barplot(x='metric', y='value', hue='model', data=ranking_metrics_test_df, palette='Reds', ax=ax2)
 ax1.set_title('ranking performance')
