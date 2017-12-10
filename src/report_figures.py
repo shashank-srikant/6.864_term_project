@@ -56,7 +56,6 @@ with open(filename) as f:
 
 
 #generate plots
-"""
 plt.figure()
 plt.plot(figures_lstm['lstm_training_loss'], c='r', lw=2.0, label='LSTM')
 plt.plot(figures_cnn['cnn_training_loss'], c='b', lw=2.0, label='CNN')
@@ -102,7 +101,6 @@ ax1.set_title('ranking performance')
 ax1.set_ylabel('dev')
 ax2.set_ylabel('test')
 plt.savefig('../figures/report_ranking_performance.png')
-"""
 
 fpr_da_tfidf, tpr_da_tfidf, _ = roc_curve(figures_da_tfidf['tfidf_ytrue'], figures_da_tfidf['tfidf_ypred'])
 fpr_da_lstm_direct, tpr_da_lstm_direct, _ = roc_curve(figures_da_lstm_direct['lstm_direct_ytrue'], figures_da_lstm_direct['lstm_direct_ypred'])
@@ -150,8 +148,31 @@ plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
 plt.savefig('../figures/report_da_roc_part3.png')
 
+plt.figure()
+plt.plot(figures_da_lstm_adversarial['lstm_adversarial_training_loss_tot'], c='r', lw=2.0, label='LSTM')
+plt.plot(figures_da_cnn_adversarial['cnn_adversarial_training_loss_tot'], c='b', lw=2.0, label='CNN')
+plt.title("Adversarial Total Training Loss (Adam)")
+plt.xlabel("Epoch")
+plt.ylabel("Total Training Loss")
+plt.legend()
+plt.savefig('../figures/report_training_loss_adversarial_tot.png')
 
+plt.figure()
+plt.plot(figures_da_lstm_adversarial['lstm_adversarial_training_loss_dis'], c='r', lw=2.0, label='LSTM')
+plt.plot(figures_da_cnn_adversarial['cnn_adversarial_training_loss_dis'], c='b', lw=2.0, label='CNN')
+plt.title("Adversarial Discriminator Training Loss (Adam)")
+plt.xlabel("Epoch")
+plt.ylabel("Discriminator Training Loss")
+plt.legend()
+plt.savefig('../figures/report_training_loss_adversarial_dis.png')
 
+plt.figure()
+plt.plot(figures_da_lstm_adversarial['lstm_adversarial_lambda'], c='r', lw=2.0, linestyle='--', label='lambda')
+plt.title('Lambda Schedule')
+plt.xlabel('Epoch')
+plt.ylabel('Lambda')
+plt.legend()
+plt.savefig('../figures/report_da_adversarial_lambda.png')
 
 
 
