@@ -743,5 +743,22 @@ plt.ylabel('l2 norm')
 plt.legend()
 plt.savefig('../figures/domain_transfer_adversarial_weight_norm.png')
 
+#save for plotting
+figures_da_lstm_adversarial = {}
+figures_da_lstm_adversarial['lstm_adversarial_ytrue'] = y_true 
+figures_da_lstm_adversarial['lstm_adversarial_ypred'] = y_pred_lstm 
+figures_da_lstm_adversarial['lstm_adversarial_roc_auc'] = roc_auc
+figures_da_lstm_adversarial['lstm_adversarial_auc_meter'] = roc_auc_0p05fpr_meter
+figures_da_lstm_adversarial['lstm_adversarial_auc_sklearn'] = roc_auc_0p05fpr
+
+figures_da_lstm_adversarial['lstm_adversarial_lambda'] = lambda_list 
+figures_da_lstm_adversarial['lstm_adversarial_training_loss_tot'] = training_loss_tot 
+figures_da_lstm_adversarial['lstm_adversarial_training_loss_gen'] = training_loss_gen 
+figures_da_lstm_adversarial['lstm_adversarial_training_loss_dis'] = training_loss_dis 
+
+filename = SAVE_PATH + 'figures_da_lstm_adversarial.dat' 
+with open(filename, 'w') as f:
+    pickle.dump(figures_da_lstm_adversarial, f)
+
 
 
