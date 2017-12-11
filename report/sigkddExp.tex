@@ -156,7 +156,7 @@ This work is organized into the following sections - Section \ref{related} discu
 &   \includegraphics[width=\columnwidth]{img/similar}
 \\
    \includegraphics[width=\columnwidth]{img/cnn}
-&   \includegraphics[width=\columnwidth]{img/cnn}
+&   \includegraphics[width=\columnwidth]{img/lstm}
 \end{tabular}
 \label{fig:len_hist}
 \caption{Summary of the \textit{Ask Ubuntu} dataset}
@@ -166,7 +166,7 @@ This work is organized into the following sections - Section \ref{related} discu
 \label{related}
 Given the growing popularity of community QA forums, question retrieval has emerged as an important area of research. Recent work has also gone beyond word-based methods to represent this task. For instance, Feng et. al. \cite{feng2015applying} learn word embeddings using category-based metadata information for questions. They define each question as a distribution which generates each word (embedding) independently, and subsequently use a Fisher kernel to assess question similarities. Dos Santos et. al. \cite{dos2015learning} propose an approach which combines a convolutional neural network (CNN) and a bag of words representation for comparing questions. In contrast to \cite{feng2015applying}, Lei et. al. \cite{lei2015semi} treat each question as a word sequence as opposed to a bag of words, and apply recurrent CNNs instead of traditional CNNs. We base our work on \cite{lei2015semi}. We apply different off-the-shelf deep learning models to encode a meaningful embedding and define similarity over these embeddings.
 
-Domain adaptation has been an active area of research in NLP. Table \ref{tab:related_work}  summarizes different settings of transfer learning \cite{pan2010survey}. Our work explores techniques in unsupervised domain adaptation, where the source and target domains ($\mathcal{D}$) are different, but share a common task ($T$) to achieve. The summary helps in understanding where our approach lies in this spectrum of techniques.
+Domain adaptation has been an active area of research in NLP. Table \ref{tab:related_work}  summarizes different settings of transfer learning \cite{pan2010survey}. Our work explores techniques in unsupervised domain adaptation, where the source and target domains ($\mathcal{D}$) are different, but share a common task ($\mathcal{T}$) to achieve. The summary helps in understanding where our approach lies in this spectrum of techniques.
 
 We study in this work the scenario where the domains vary while the tasks remain the same. This is referred to as transductive transfer learning. This is the most extensively studied settings in the transfer learning literature and can be broadly categorized as single and multi-source adaptation. Single source adaptation\cite{chen2009extracting, ando2005framework, daume2009frustratingly} primarily aims at minimizing the divergence between the source and target domains either at instance or feature levels. The general idea being identifying a suitable low dimensional space where transformed source and target domains data follow similar distributions and hence, a standard supervised learning algorithm can be trained.
 
@@ -247,17 +247,16 @@ We define a CNN with the following layers -
 \end{itemize}
 
 \subsection{LSTM}
-{\color{red} TODO: describe the architecture, add a figure for both CNN and LSTM}
-We describe the CNN architecture implemented in this work. We detail the inputs to the different layers of the network, which should help illustrate the architecture.
-We define a CNN with the following layers -
+{\color{red} 
+We describe the LSTM architecture implemented in this work. We detail the inputs to the different layers of the network, which should help illustrate the architecture.
+We define the LSTM with the following layers -
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-\item \textbf{Input vector $\mathbf{X}$} Dimensions: ($\mathbf{B}$, $\mathbf{W}$) ($\mathbf{B}$: batch size, $\mathbf{W}$: max \# of words in sentence in batch)
-\item \textbf{Embedding layer} Pass $\mathbf{X}$ through embeddings layer. Resulting dimension: ($\mathbf{B}$, $\mathbf{W}$, $\mathbf{D}$) ($\mathbf{D}$: \# of embeddings per word)
-\item \textbf{Convolution, ReLU} Pass the above input through a convolution layer and then through ReLU. Resulting dimension: ($\mathbf{B}$, $\mathbf{K}$, $\mathbf{Y}$)($\mathbf{K}$: Depth of filter, i.e. \# of filters of given height, $\mathbf{Y}$: \# of values sliding the filter over the input)
-\item \textbf{Pooling} Pass through mean pooling. Resulting dimension: ($\mathbf{B}$, $\mathbf{K}$)
-\item The resulting encoded embedding of dimension ($\mathbf{B}$, $\mathbf{K}$) for $\mathbf{B}$ words in a given batch.
+\item \textbf{Input vector $\mathbf{X}$} with dimensions: [$\mathbf{B}$, $\mathbf{W}$, $\mathbf{D}$], where $\mathbf{B}$ is the batch size, $\mathbf{W}$ is max number of words, and $\mathbf{D}$ is the embedding dimension
+\item \textbf{Embedding layer} is used to look up word embeddings given  the indices $\mathbf{X}$.
+\item \textbf{LSTM layer} returns LSTM output used for average pooling as well as the hidden state and LSTM cell state.
+\item \textbf{Pooling} Average pooling is used to average the outputs of the bi-directional LSTM producing a summary vector of dimension [$\mathbf{B}$, $2\times \mathbf{H}$], where $\mathbf{H}$ is the hidden size. 
 \end{itemize}
-
+}
 \section{Domain Adaptation (DA)}
 \label{domain_adapt}
  We use adversarial training techniques \cite{ganin2015unsupervised} to adapt to a domain having no labeled data, having trained a model on a domain with labeled data. In this section and the next, we describe the dataset we worked on, the architecture for the adversarial model we use, and other models for DA we tried.
@@ -272,6 +271,15 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
     \item While the primary goal of predicting $\mathcal{Y}_\mathsf{source}$ remains, we define an adversarial objective to guide the direction of the embeddings encoded by the encoder network in a way to make them abstract enough to be able to discriminate $\mathcal{Y}_\mathsf{target}$ as well.
     \item We do this by setting up another network to learn this adversarial objective. We refer to this network as \textit{adversarial network} here on. We set the goal of the adversarial network to predict whether a given data-point input to it originates from either the $\mathsf{source}$ or $\mathsf{target}$ dataset. The idea behind setting up this objective is that if the origin of the input data is being discriminated well by the adversarial network, then the features are still specific enough to discriminate between the two datasets. What we want is to however have an abstract enough feature space which, in spite of predicting the labels of the $\mathsf{source}$ well, is unable to distinguish between the $\mathsf{source}$ and $\mathsf{target}$ dataset.
     \item The objective of the adversarial network is set up in a way to propogate a negative weight to the encoder whenever it successfully discriminates between $\mathsf{source}$ and $\mathsf{target}$. This ensures the successful transfer of the encoded embeddings to the $\mathsf{target}$ domain. Figure \ref{fig:adversary} depicts this arrangement.
+    \item {\color{red} Let $\theta_f$ be the parameters of the question encoder (generator) $G_f$ and $\theta_d$ be the parameters of the domain classifier (discriminator). Then we can write down our loss objective as:
+    \begin{eqnarray}
+     \min E(\theta_f, \theta_d) = \sum_{i=1}^{n}L_{y}^{i}(\theta_f) - \lambda^{t}\sum_{i=1}^{n}L_{d}^{i}(\theta_f, \theta_d) = \\
+     \sum_{i=1}^{n}L_y(G_f(x_i;\theta_f), y_i) 
+      - \lambda^{t} \sum_{i=1}^{n}L_d(G_d(G_f(x_i;\theta_f), \theta_d), y_i)
+    \end{eqnarray}
+    where $L_y(\theta_f)$ is the multi-margin loss and $L_d(\theta_f, \theta_d)$ is the binary cross-entropy loss. Thus, we want to minimize the multi-margin loss and maximize cross-entropy loss (confusion of the domain classifier) during adversarial training. At the same time, we want the discriminator to be accurate in domain classification. We can accomplish this with a single back-propagation step by minimizing the total loss $E(\theta_f, \theta_d)$ above and reversing the gradient of the domain classifier during the weight update, e.g. by setting a negative learning rate.
+    }
+    
 \end{itemize}
 
 
@@ -285,13 +293,19 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
 
 \section{Exploring Domain Adaptation}
 \label{other_techniques}
-We explored two other techniques to carry out unsupervised domain transfer - $\textsf{Doc2Vec}$ \cite{doc2vec1} and Siamese recurrent networks \cite{siamese}. We describe each briefly here:
-
+We explored two other techniques to carry out unsupervised domain transfer - $\textsf{doc2vec}$ \cite{doc2vec1} and Siamese recurrent networks \cite{siamese}. We describe each briefly here:
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-\item $\mathbf{\mathsf{Doc2Vec}}$ Paragraph vectors, or $\mathsf{doc2vec}$, were proposed by Le and Mikolov (2014) as a simple extension to word2vec to extend the learning of embeddings from words to word sequences. $\mathsf{doc2vec}$ is agnostic to the  granularity of the word sequence — it can equally be a word n-gram, sentence, paragraph or document. In this paper, we use the term ``document embedding'' to refer to the embedding of title and body.
-
-\item \textbf{Siamese networks} 
-{\color{red} TODO}
+{\color{red}
+\item $\textbf{doc2vec}$. A doc2vec model was proposed by Le and Mikolov (2014) as an extension of word2vec to learn fixed-length feature representations from variable-length pieces of texts, such as sentences, paragraphs, and documents. Thus, each document is represented by a dense vector which is trained to predict words in the document. There are two doc2vec architectures: Distributed Memory (DM) and Continous Bag of Words (CBOW) as shown in Figure{}. A doc2vec model introduces a document vector to learn a predictive context similar to word2vec. The DM model acts as memory that remembers what is missing from the current context. While the word vectors represent the concept of a word, the document vector intends to represent the concept of a document. The CBOW model samples a text window, then samples a random word from the text window and forms a classification task of predicting the random word given the text window.
+}
+\item \textbf{Siamese RNN} 
+{\color{red} Siamese neural networks \ref{} are characterized by shared weights and are trained with a \textit{contrastive loss function} that differentiates between the inputs. Thus, siamese nets are well-suited for computing similarity between a query and a candidate question. We use a shared bi-directional LSTM as an input encoder and add several fully connected layers for domain adaptation. The siamese architecture is shown in Figure \ref{}. The contrastive loss function $L(x_1,x_2,y)$ is defined as
+\begin{eqnarray}
+L &=& \frac{1}{2}(1-y)D_{w}^{2} + \frac{1}{2}y \max \{0, -D_w + \Delta\}^{2} \\
+D_w &=& \sqrt{[RNN(x_1) - RNN(x_2)]^2}
+\end{eqnarray}
+where $y$ is a binary label equal to $0$ for similar inputs (in which case we want to minimize the distance $D_w$) and equal to $1$ for dissimilar inputs (in which case we want to maintain a margin $\Delta$). The distance $D_w$ is a pairwise Euclidean distance between RNN encodings of the inputs $x_1$ and $x_2$. In order for the Siamese RNN to generalize to domain adaptation, we include dropout \ref{Hinton} in between the dense layers with keep probability equal to $0.5$. Alternatively, \textit{variational dropout} \ref{Kingma} can be used to tune the keep probability to improve generalization performance.
+}
 
 \end{itemize}
 
@@ -314,26 +328,27 @@ We explored two other techniques to carry out unsupervised domain transfer - $\t
 \label{experiments}
 We pose the following research questions, whose answers we investigate in this work
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-\item \textbf{E1:} How well do deep neural encoders solve the task of in-domain question retrieval. How does it compare to baselines and the state of the art? What are the limitations.
-\item \textbf{E2:} How effective are deep adversarial neural methods in adapting from one domain to another to learn a common task. How does it compare to the baselines and state of the art? What are the limitations?
-\item \textbf{E3:} How effective is $\mathsf{doc2vec}$ in adapting knowledge from one domain to another.
-\item \textbf{E4:} How effective are Siamese networks in adapting knowledge from one domain to another.
+\item \textbf{E1:} How well do deep neural encoders {\color{red} such as LSTM and CNN solve the task of in-domain question retrieval. How do they compare to baselines and the state of the art? What are the limitations?}
+\item \textbf{E2:} How effective are deep adversarial neural methods in adapting from one domain to another to learn a common task. {\color{red}How do they compare to baselines and the state of the art?} What are the limitations?
+{\color{red}
+\item \textbf{E3:} The utility of siamese neural network architecture and $\mathsf{doc2vec}$ representation in application to question similarity and domain adaptation.
+}
 \end{itemize}
 
 \subsection{Experiment 1}
-To answer $\mathbf{E1}$, we measure the performance of our neural encoders against a baseline of $\mathsf{BM25 scores}$ provided for each query in the test set of the corpus. These scores are pre-computed for each query-positive and query-negative pair. The ranked list of these scores per query is used as a baseline performance on the four metrics we choose (see Section \ref{in_domain} for details on the metrics).
+To answer $\mathbf{E1}$, we measure the performance of our neural encoders against a baseline of $\mathsf{BM25}$ scores provided for each query in the test set of the corpus. These scores are pre-computed for each query-positive and query-negative pair. The ranked list of these scores per query is used as a baseline performance on the four metrics we choose (see Section \ref{in_domain} for details on the metrics).
 
 \textbf{Implementation specifics:}
-In our implementation, we ensure that stop words are removed from the corpus. This reduces the average sentence length by 30\%. Each input in a batch that we pass to our network consists of words in a query, one positive question corresponding to it and all its corresponding negative questions. We pad unseen words in the pre-trained embeddings with 0s. We also equate sentence length in a batch by padding with 0s. The 0-padding is taken into account while mean pooling the intermediate results in the network. We do not train the pre-trained embedding layer. In this work, to limit computational requirements, we consider only the first 10 words in the title and the first 100 words in the body of each sentence. Further, we score only 40 random negative questions per query instead of the full 100 provided in the dataset. All hyperparameters are tuned on the dev set. The number of trainable network parameters are constrained to a budget of 450K parameters so that the expressability of the models are comparable. Table {\color{red} XX} describes the various hyperparameters of the encoder and adversarial network. The model is trained on {\color{red} XX samples and tested on YY samples. All experiments were carried out on a XXX machine. Each model was run for {\color{red} XX epochs} to train. Each epoch took XX minutes, and we were able to train the network on the full training-set in under 180 minutes.}
+In our implementation, we ensure that stop words are removed from the corpus. This reduces the average sentence length by 30\%. Each input in a batch that we pass to our network consists of words in a query, one positive question {\color{red} \st{corresponding to it}} and all its corresponding negative questions. {\color{red} We represent unseen words in the pre-trained embeddings with an all-zero vector. We also equate sentence length by padding with $0$s to maximum length}. The 0-padding is taken into account while mean pooling the intermediate results in the network. We do not train the pre-trained embedding layer. In this work, to limit computational requirements, we consider only the first 10 words in the title and the first 100 words in the body of each sentence. Further, we score only 40 random negative questions per query instead of the full 100 provided in the dataset. All hyperparameters are tuned on the dev set. The number of trainable network parameters are constrained to a budget of $450K$ parameters so that the expressability of the models are comparable. Table {\color{red} XX} describes the various hyperparameters of the encoder and adversarial network. The model is trained on {\color{red} XX samples and tested on YY samples.\st{A drop-out layer is added in both networks. Unseen words are treated as 0-vectors}. All experiments were carried out on a CUDA-enabled GTX Titan GPU. Each model was run for {\color{red} 16 training epochs, averaging to $15$ min/epoch for LSTM and $10$ min/epoch for CNN. \st{and we were able to train the network on the full training-set in under 180 minutes.}}}
 
 \textbf{Results:}
-Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of question retrieval and similiarity. CNN and LSTM denote the performance of our two neural encoders while $\textsf{BM25}$ denotes the baseline scores gathered from Apache Lucene. Against each of our models, we also record the number of trainable parameters used. The performance is on the scale $0$-$1$, where higher the number, better the retrieval. We analyze and discuss these results in Section \ref{discussion}.
+Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of question retrieval and similiarity. {\color{red}We compare ranking performance of CNN and LSTM models against $\textsf{BM25}$ based ranking by Apache Lucene. We also record the number of trainable parameters used. Higher number indicates higher performance.} We analyze and discuss these results in Section \ref{discussion}.
 
 
 \begin{table}[h]
 \begin{tabular}{l|r|l|r}
-      \multicolumn{2}{c|}{\textbf{CNN}}
-     & \multicolumn{2}{c}{\textbf{LSTM}}
+      \multicolumn{2}{c|}{\textbf{CNN direct}}
+     & \multicolumn{2}{c}{\textbf{LSTM direct}}
      \\
      \toprule
      \textbf{Parameter}
@@ -362,23 +377,27 @@ Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of
      & pooling
      & average
 \end{tabular}
+\caption{Optimal parameters of the direct transfer CNN and LSTM networks.}
+\label{tab:param_direct}
 \end{table}
 
+
+
 \subsection{Experiment 2} 
-To answer $\mathbf{E2}$, we measure the performance of domain adaptation on the \textit{Android Stack Exchange} dataset, having learnt a model on the \textit{Ask Ubuntu} dataset.
+To answer $\mathbf{E2}$, we measure the performance of domain adaptation on the \textit{Android Stack Exchange} dataset, having learned a model on the \textit{AskUbuntu} dataset.
 
-\textbf{Evaluation:} The evaluation metric for this task is changed to instead evaluate a binary classification task - is a query similar to a given candidate question present in the corpus or not. As a consequence, the robustness of the system is measured using a $AUC(0.05)$ score. Since the metric to evaluate the two experiments are different, we do not compare the performance across experiments.
+\textbf{Evaluation:} The evaluation metric for this task is {\color{red} Area Under ROC Curve (AUC) since we are interested in a binary classification task of whether a query is similar or not to a candidate question. As a consequence, the robustness of the system is measured using a AUC(0.05) score, which corresponds to AUC with $\mathrm{FPR} \leq 0.05$. \st{Since the metric to evaluate the two experiments are different, we do not compare the performance across experiments.}}
 
-\textbf{Baselines:} We establish multiple baselines - some stronger than the other. To begin with, we train a TF-IDF model on the $\textsf{source}$ domain and evaluate on the $\textsf{target}$ domain. As a slightly stronger baseline, we directly apply the model learnt in $\mathbf{E1}$ onto the $\textsf{target}$ domain.
+\textbf{Baselines:} {\color{red} We establish multiple strong baselines: such as the count based TF-IDF model trained on $\textsf{source}$ domain and evaluated on the $\textsf{target}$ domain. In addition, we directly apply the models learned in $\mathbf{E1}$ onto the $\textsf{target}$ domain.}
 
-\textbf{Implementation specifics:} We train the encoder network from scratch to train the two objectives detailed in Section \ref{domain_adapt}. We maintain the constraint of evaluating on 40 negative samples for the $\mathsf{source}$ label classifier but do not vary the validation/test set for the $\mathsf{target}$ domain. We maintain the same constraints on the length of the title and body as in $\mathbf{E1}$. Stop-words and word-casing are handled for the $\mathsf{target}$ domain. We evaluate the system on both, pre-trained embeddings used in $\mathbf{E1}$ and off-the-shelf $\mathsf{GloVe}$ embeddings \cite{pennington2014glove}. All hyperparameters are tuned on the dev set. The model is trained on {\color{red} XX samples and tested on YY samples. All experiments were carried out on a XXX machine. Each model was run for {\color{red} XX epochs} to train. Each epoch took XX minutes, and we were able to train the network on the full training-set in under 180 minutes.}
+\textbf{Implementation specifics:} {\color{red} We train the adversarial LSTM and CNN models from scratch as detailed in Section \ref{domain_adapt}. We maintain the constraint of 40 negative samples for the $\mathsf{source}$ domain but do not vary the dev/test set for the $\mathsf{target}$ domain.} We maintain the same constraints on the length of the title and body as in $\mathbf{E1}$. Stop-words and word-casing are handled for the $\mathsf{target}$ domain. We evaluate the system on both, pre-trained embeddings used in $\mathbf{E1}$ and {\color{red} 6B tokens, 300-dimensional}  $\mathsf{GloVe}$ embeddings \cite{pennington2014glove}. All hyperparameters are tuned on the dev set. {\color{red} \st{The model is trained on XX samples and tested on YY samples. All experiments were carried out on a XXX machine. Each model was run for XX epochs to train. Each epoch took XX minutes, and we were able to train the network on the full training-set in under 180 minutes.}}
 
-\textbf{Results:} Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of domain adaptation for question retrieval. Models with the suffix $\mathsf{xx-direct}$ in column 1, Table \ref{tab:exp1} correspond to the direct-transfer baseline models. The adversarial models are described with the suffix $\mathsf{xx-adv}$. The evaluation metric is AUC(0.05), which is reported on a scale of $0$-$1$. An AUC(0.05) score of $1$ implies that {\color{red}the model has a false positive rate of $<$0.05\%}. Results are reported for both, the dev and test sets. We analyze and discuss these results in Section \ref{discussion}.
+\textbf{Results:} Table \ref{tab:exp23} tabulates the performance of LSTM and CNN neural encoders on the task of domain adaptation for question retrieval. {\color{red} Higher number indicates higher performance. AUC(0.05) refers to ROC AUC for which $\mathrm{FPR} \leq 0.05$. \st{Models with the suffix $\mathsf{xx-direct}$ in column 1, Table correspond to the direct-transfer baseline models. The adversarial models are described with the suffix $\mathsf{xx-adv}$. The evaluation metric is AUC(0.05), which is reported on a scale of $0$-$1$. An AUC(0.05) score of $1$ implies that the model has a false positive rate of $<$0.05\%.}} We analyze and discuss these results in Section \ref{discussion}.
 
 \begin{table}[h]
     \begin{tabular}{l|r|l|r}
-          \multicolumn{2}{c|}{\textbf{CNN}}
-         & \multicolumn{2}{c}{\textbf{LSTM}}
+          \multicolumn{2}{c|}{\textbf{CNN adversarial}}
+         & \multicolumn{2}{c}{\textbf{LSTM adversarial}}
          \\
          \toprule
          \textbf{Parameter}
@@ -387,57 +406,68 @@ To answer $\mathbf{E2}$, we measure the performance of domain adaptation on the 
          & \textbf{Value}
          \\
          \midrule
-         \# of sentences
-         & 40
-         & \# of sentences
-         & 50
+         lambda
+         & 1e-6
+         & lambda
+         & 1e-7
          \\
-         \# of stop words 
-         & 50
-         & \# of sentences
-         & 90
+         discriminator
+         & 4-layer MLP
+         & discriminator
+         & 4-layer MLP
          \\
-         mean word length - title
-         & 299
-         & \# of sentences
+         output channels
+         & 200
+         & hidden size
+         & 128
+         \\
+         kernel size
+         & [2-6] x 200
+         & bidirectional
+         & false
+         \\
+         embed dim
+         & 300
+         & embed dim
          & 300
          \\
-         mean word length - body
-         & 299
-         & \# of sentences
-         & 300
+         pooling
+         & average
+         & pooling
+         & average
          \\
-         Batch size
-         & 299
-         & \# of sentences
-         & 300
-         \\
-         Number of epochs
-         & 299
-         & \# of sentences
-         & 300
-         \\
-         mean word length - body
-         & 299
-         & \# of sentences
-         & 300
+         batch size
+         & 32
+         & batch size
+         & 32
     \end{tabular}
-    \caption{Parameters of the encoder and adversarial\protect\\ networks for domain adaptation}
-    \label{tab:param_indomain}
+    \caption{Optimal parameters of the adversarial CNN and LSTM networks.}
+    \label{tab:param_adversarial}
 \end{table}
 
-
+\begin{figure*}[h]
+\begin{tabular}{cc}
+    \includegraphics[width=\columnwidth]{img/doc2vec_architecture.png}
+&   \includegraphics[width=0.7\columnwidth]{img/siamese_architecture.png}
+\end{tabular}
+\label{fig:part3_arch}
+\caption{doc2vec architecture (left) and Siamese RNN architecture (right).}
+\end{figure*}
 
 \subsection{Experiment 3}
-{\color{red} TODO}
-To answer $\mathbf{E1}$, we measure the performance of our neural encoders against a baseline of $\mathsf{BM25 scores}$ provided for each query in the test set of the corpus. These scores are pre-computed for each query-positive and query-negative pair. The ranked list of these scores per query is used as a baseline performance on the four metrics we choose (see Section \ref{in_domain} for details on the metrics).
-
+{\color{red}
+To answer $\mathbf{E3}$, we explore a new architecture based on Siamese RNN and a new representation of the question title and body based on doc2vec as shown in Figure \ref{fig:part3_arch} \\}
 \textbf{Implementation specifics:}
-In our implementation, we ensure that stop words are removed from the corpus. This reduces the average sentence length by 30\%. Each input in a batch that we pass to our network consists of words in a query, one positive question corresponding to it and all its corresponding negative questions. We pad unseen words in the pre-trained embeddings with 0s. We also equate sentence length in a batch by padding with 0s. The 0-padding is taken into account while mean pooling the intermediate results in the network. We do not train the pre-trained embedding layer. In this work, to limit computational requirements, we consider only the first 10 words in the title and the first 100 words in the body of each sentence. Further, we score only 40 random negative questions per query instead of the full 100 provided in the dataset. All hyperparameters are tuned on the dev set. The number of trainable network parameters are constrained to a budget of 450K parameters so that the expressability of the models are comparable. Table {\color{red} XX} describes the various hyperparameters of the encoder and adversarial network. The model is trained on {\color{red} XX samples and tested on YY samples. All experiments were carried out on a XXX machine. Each model was run for {\color{red} XX epochs} to train. Each epoch took XX minutes, and we were able to train the network on the full training-set in under 180 minutes.}
+{\color{red} We use the same set-up as the direct transfer experiments, in which we train on source dataset and evaluate on target. In the case of Siamese RNN, we feed a batch of (query, candidate) question pairs and a label equal to $0$ for a pair of similar questions and equal to $1$ for a pair of dis-similar questions. We use 6B tokens, 300-dimensional GloVe embeddings to represent the word vectors. In addition to sister siamese networks with shared weights, we add several dense layers to increase the degrees of freedom required for domain transfer. To aid generalization, a dropout layer is used between the dense layers with keep probability of 0.5.\\
+
+In the case of doc2vec, we consider two variations: the distributed memory (DM) and the distributed bag of words (DBOW). In both cases, the title and the body are concatenated into one document for every query. The doc2vec models are then trained on source dataset for $64$ epochs with a linear learning rate decay schedule starting at 0.025. The word embeddings and the document vectors are learned during the trainining process on the source dataset.}
+
+\textbf{Results:} {\color{red} Table \ref{tab:exp23} tabulates the performance of Siamese RNN and doc2vec models on the task of domain adaptation for question retrieval. Higher number indicates higher performance. AUC(0.05) refers to ROC AUC for which $\mathrm{FPR} \leq 0.05$. We analyze and discuss these results in Section \ref{discussion}.}
+
 \begin{table}[h]
  \begin{tabular}{l|r|l|r}
-          \multicolumn{2}{c|}{\textbf{Siamese}}
-         & \multicolumn{2}{c}{\textbf{\textsf{doc2vec}}}
+          \multicolumn{2}{c|}{\textbf{Siamese RNN}}
+         & \multicolumn{2}{c}{\textbf{\textsf{doc2vec DM/DBOW}}}
          \\
          \toprule
          \textbf{Parameter}
@@ -446,41 +476,37 @@ In our implementation, we ensure that stop words are removed from the corpus. Th
          & \textbf{Value}
          \\
          \midrule
-         \# of sentences
-         & 40
-         & \# of sentences
-         & 50
+         hidden size
+         & 128
+         & doc2vec dim
+         & 256
          \\
-         \# of stop words 
-         & 50
-         & \# of sentences
-         & 90
+         bidirectional
+         & true
+         & context window
+         & 10
          \\
-         mean word length - title
-         & 299
-         & \# of sentences
-         & 300
+         dropout prob
+         & 0.5
+         & min count
+         & 2
          \\
-         mean word length - body
-         & 299
-         & \# of sentences
-         & 300
+         loss margin
+         & 0.5
+         & learning rate
+         & 0.025
     \end{tabular}
-    \caption{Parameters of $\mathsf{doc2vec}$ and the Siamese network architectures}
-    \label{tab:indomain}
+    \caption{Optimal parameters of Siamese RNN and $\mathsf{doc2vec}$ models.}
+    \label{tab:part3_params}
 \end{table}
-
-\subsection{Experiment 4}
-{\color{red} TODO}
 
 \begin{table*}[h]
     \centering
-    \begin{tabular*}{0.8\textwidth}{c | m{0.12\linewidth} | c c c c | c c c r}
-         \toprule
+    \begin{tabular*}{0.8\textwidth}{c | c | c c c c | c c c c}
          \toprule
          
-         \multirow{2}{*}{\textbf{Model name}}
-         & \multirow{2}{*}{\textbf{\shortstack{\# of param \\ in the n/w}}}
+         \multirow{2}{*}{\textbf{model}}
+         & \multirow{2}{*}{\textbf{\shortstack{params}}}
          & \multicolumn{4}{c|}{\textbf{Test}}
          & \multicolumn{4}{c}{\textbf{Dev}}
          \\
@@ -498,124 +524,161 @@ In our implementation, we ensure that stop words are removed from the corpus. Th
          \\
          \midrule
          \textbf{BM25 baseline}
-         & NA
+         & N/A
          & 0.68
          & 0.54
          & 0.42
          & 0.56
-         & 0.66
-         & 0.52
+         & \textbf{0.66}
+         & \textbf{0.52}
          & 0.42
          & 0.52
          \\
          \midrule
          \textbf{CNN}
-         & 337290
-         & 0.63
-         & 0.48
-         & 0.40
-         & 0.43
-         & 0.63
-         & 0.49
-         & 0.41
-         & 0.51
+         & {\color{red}TODO}
+         & {\color{red}0.67}
+         & {\color{red}0.52}
+         & {\color{red}0.42}
+         & {\color{red}0.56}
+         & {\color{red}0.63}
+         & {\color{red}0.46}
+         & {\color{red}0.42}
+         & {\color{red}0.53}
          \\
          \midrule
          \textbf{LSTM}
-         & 337290
-         & 0.69
-         & 0.54
-         & 0.42
-         & 0.56
+         & {\color{red}337,920}
+         & \textbf{0.69}
+         & \textbf{0.54}
+         & \textbf{0.42}
+         & \textbf{0.56}
          & 0.65
          & 0.48
-         & 0.44
-         & 0.54
-         
+         & \textbf{0.44}
+         & \textbf{0.54}
+         \\
+        \bottomrule
     \end{tabular*}
-    \caption{Results for Experiment 1 - In-domain learning using neural models}
+    \caption{{\color{red} (comment: tried to make the table prettier) Results for Experiment 1: in-domain learning using neural models.}}
     \label{tab:exp1}
  
  \vspace{7pt}
   
-    \begin{tabular}{r | c | r | r}
+    \begin{tabular}{ l | c | c}
     \toprule
-    \toprule
-    \textbf{Model name}
-    & \textbf{Description}
+    \textbf{model}
+    & \textbf{AUC - Test}
     & \textbf{AUC(0.05) - Test}
-    & \textbf{AUC(0.05) - Dev}
     \\
     \toprule
     \textbf{TF-IDF}
-    & Baseline
-    & 0.58
-    & 0.58
+    & 0.94
+    & 0.62
     \\
-    \cmidrule{1-4} 
+    \cmidrule{1-1} 
     \textbf{CNN-direct}
-    & \multirow{2}{*}{Direct transfer}
-    & 0.62
-    & 0.62
+    & 0.81
+    & 0.33
     \\
     \cmidrule{1-1} 
-    \cmidrule{3-4} 
     \textbf{LSTM-direct}
-    & 
-    & 0.62
-    & 0.63
+    & 0.90
+    & 0.43
     \\
     \midrule
-    \textbf{CNN-adv}
-    & \multirow{2}{*}{Adversarial domain transfer}
-    & 0.70
-    & 0.70
+    \textbf{CNN-adversarial}
+    & \textbf{0.96}
+    & \textbf{0.76}
     \\
     \cmidrule{1-1} 
-    \cmidrule{3-4}
-    \textbf{LSTM-adv}
-    &
-    & 0.70
-    & 0.70
+    \textbf{LSTM-adversarial}
+    & 0.96
+    & 0.74
     \\
     \midrule
-    \textbf{Siamese networks}
-    & \multirow{2}{*}{Other domain transfer methods}
-    & 0.70
-    & 0.70
+    \textbf{Siamese}
+    & 0.74
+    & 0.20
     \\
     \cmidrule{1-1} 
-    \cmidrule{3-4}
-    \textbf{\textsf{Doc2Vec}}
-    &
-    & 0.70
-    & 0.70
+    \textbf{doc2vec-DM}
+    & 0.83
+    & 0.36
+    \\
+    \cmidrule{1-1}
+    \textbf{doc2vec-DBOW}
+    & 0.82
+    & 0.29    
     \\
     \bottomrule
     \end{tabular}
-    \caption{Results from Experiment 2 - Domain adaptation}
+    \caption{{\color{red}(comment: all numbers are up-to-date, tried to make the table prettier) Results for Experiments 2 and 3: Domain Adaptation}}
+    \label{tab:exp23}
 \end{table*}
+
+\begin{figure*}[h]
+\begin{tabular}{ccc}
+    \includegraphics[width=0.7\columnwidth]{img/report_training_loss_part1.png}
+&   \includegraphics[width=0.7\columnwidth]{img/report_learning_rate_schedule.png}
+&   \includegraphics[width=0.7\columnwidth]{img/report_ranking_performance.png}
+\end{tabular}
+\label{fig:exp1a}
+\caption{Results from Experiment 1}
+\end{figure*}
+
+\begin{figure*}[h]
+\begin{tabular}{cc}
+    \includegraphics[width=\columnwidth]{img/report_domain_transfer_tfidf_hist.png}
+&   \includegraphics[width=\columnwidth]{img/report_da_roc_direct.png}
+\end{tabular}
+\label{fig:exp2a}
+\caption{Results from Experiment 2: direct transfer}
+\end{figure*}
 
 
 \begin{figure*}[h]
-\begin{tabular}{cccc}
-    \includegraphics[width=0.5\columnwidth]{img/cnn_training_loss_toy}
-&   \includegraphics[width=0.5\columnwidth]{img/cnn_domain_transfer_adversarial_gradient_norm}
-&   \includegraphics[width=0.5\columnwidth]{img/domain_transfer_direct_lstm_hist}
-&   \includegraphics[width=0.5\columnwidth]{img/cnn_domain_transfer_adversarial_lstm}
+\begin{tabular}{cc}
+    \includegraphics[width=\columnwidth]{img/report_training_loss_adversarial_tot.png}
+&   \includegraphics[width=\columnwidth]{img/report_training_loss_adversarial_dis.png}
+
 \end{tabular}
-\label{fig:len_hist}
-\caption{Results from Experiment 1}
+\label{fig:exp2b}
+\caption{Results from Experiment 2: adversarial loss}
+\end{figure*}
+
+\begin{figure*}[h]
+\begin{tabular}{ccc}
+    \includegraphics[width=0.7\columnwidth]{img/report_da_roc_adversarial_3.png}
+&   \includegraphics[width=0.7\columnwidth]{img/report_da_adversarial_weight_norm.png}
+&   \includegraphics[width=0.7\columnwidth]{img/report_da_adversarial_gradient_norm.png}
+\end{tabular}
+\label{fig:exp2c}
+\caption{Results from Experiment 2: ROC, weight and gradient norms}
+\end{figure*}
+
+\begin{figure*}[h]
+\begin{tabular}{c}
+    \includegraphics[width=\columnwidth]{img/report_da_roc_part3.png}
+\end{tabular}
+\label{fig:exp3}
+\caption{Results from Experiment 3}
 \end{figure*}
 
 \section{Discussion}
 \label{discussion}
 \subsection{Experiment 1}
-{\color{red}TODO: add adversarial training objectives, discuss stability of changing lambda, discuss differences with siamese networks etc.}
-We observe that both, the LSTM and the CNN networks, beat the \textsf{BM25} baseline by {\color{red}XX points} on an average on each of the metrics. We notice that this accuracy is achieved with a very simple model architecture, without any effort invested in engineering features. Such a performance by off-the-shelf models suggests that neural models are an apt choice for modeling such tasks.  Figures \ref{fig:len_hist, fig:len_hist} describe the loss function over different epochs for the CNN and LSTM respectively. We note here though that we found the results to be sensitive to different hyperparameter choices. With the right choice of hyperparameters, we could gain 10 points on an average on all the metrics. For instance, we found \textsf{tanh} to produce better results over using \textsf{ReLU} as an activation function for the CNNs. We found the learning rates of \textit{Adam}, the optimizer, when outside the range of {\color{red}XX, to have an adverse effect on the results}. We found that mean pooling and max pooling produced comparable results on both networks. We found the choice of the margin in the maximum-margin separator to specially have an effect on the performance. Moving it by 0.5 points above or below the margin set for the final models (see Table \ref{tab:hyperparam_exp1}) decreased the final accuracy by 0.10 units.
+{\color{red} Figure \ref{fig:exp1a} (left) shows the training loss for both LSTM and CNN networks as a result of training with a learning rate decay schedule as shown in Figure \ref{fig:exp1a} (middle). The initial learning rate was set to 1e-3 and was halved every $4$ epochs. The ranking performance on the test set is summarized in Figure \ref{fig:exp1a} (right). We can see that LSTM achieves slightly higher performance in comparison to CNN. However, due to the re-current nature of LSTM it takes longer to train. From Table \ref{tab:exp1}, we can see that LSTM achieves slightly higher performance in comparison to the BM25 benchmark. In the process of hyper-parameter optimization, we discovered that average pooling (in contrast to last pooling) gives slight advantage, in additional bi-directional LSTM is able to better capture the information in the title and body of the training questions. In the case of CNN, we found that increasing the number of output channels and using tanh activation resulted in higher performance. As seen from Table \ref{tab:exp1}, both LSTM and CNN prove valuable encoding techniques for representing a query. Additional improvement could be attained using a gated CNN architecture as described in \ref{paper}. The model was performance was found to be sensitive to the choice of loss margin. By setting the margin to 0.4, we are able to attain a reduction in loss over iterations.}
 
 \subsection{Experiment 2}
-The baseline is measured against an unsupervised (TF-IDF) model being learnt on the \textsf{source} domain. In comparison, we see the direct transfer model to perform slightly better by both, the CNN and LSTM. This is expected since these models learn , but relatively the 
+{\color{red} Figure \ref{fig:exp2a} (right) shows direct domain transfer ROC AUC performance for tf-idf, LSTM and CNN models. These models form a baseline for adversarial domain transfer. Tf-idf achieves highest direct transfer AUC. Figure \ref{fig:exp2a} (left) shows the positive and negative class separation attained by the tf-idf model. This histogram is normalized since the number of negative examples in the dataset far exceeds the number of positive (similar) question pairs. We can see that by varying the threshold on the predicted label, we can attain the ROC curve shown on the right. Notice that the two classes are well-separated by the tf-idf model leading to a high AUC score.\\
+Figure \ref{fig:exp2b} (left) shows the total adversarial training loss for both LSTM and CNN models. We can see the difference in initialization of the two models by comparing the loss at epoch zero. The losses plateau after 8 epochs resulting in early stopping. Figure \ref{fig:exp2b} (right) shows the stochastic nature of the domain classifier loss. Its magnitude is much larger in comparison to the question encoder loss and therefore a small value of lambda (1e-6) is used to attenuate it. We found that AUC performance was very sensitive to the choice of lambda. We tried a range of values for lambda from 1e-3 to 1e-7 and we selected the lambda that gives highest AUC performance and leads to a non-negative total loss.\\
+Figure \ref{fig:exp2c} (left) shows the AUC performance of adversarial domain adaptation (DA). From Table \ref{tab:exp23} we can see that adversarial DA achieves highest AUC performance exceeding the tf-idf and direct transfer baselines. We also examined the weight and gradient norms of the domain classifier as shown in Figure \ref{fig:exp2c} (middle, right). We found that the gradient of the last of the 4 dense layers of the MLP is highest and the most stochastic. The effect of the learning rate schedule on the MLP parameter weights can also be seen from the stair-case in Figure \ref{fig:exp2c} (middle). 
+}
+
+\subsection{Experiment 3}
+{\color{red} Figure \ref{fig:exp3} shows the ROC AUC performance of the Siamese RNN and doc2vec models. From Table \ref{tab:exp23}, we can see that the performance of these two techniques performs less favorably in comparison to adversarial domain transfer. Furthermore, the DM architecture of doc2vec is slightly better in comparison to DBOW which is also reported in the original paper \cite{doc2vec_paper}. The main difference between the Siamese RNN and the LSTM encoding network is the contrastive loss function and the additional dense layers introduced in the Siamese RNN network to aid in the domain transfer. We can see that direct transfer LSTM outperforms Siamese RNN suggesting that further optimization can be done to improve the Siamese RNN network performance.}
+
 %ACKNOWLEDGEMENTS are optional
 \section{Acknowledgements}
 \label{ack}
