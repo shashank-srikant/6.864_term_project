@@ -194,8 +194,8 @@ We first explore the task of question similarity by training a domain-specific c
      \\
      \toprule
      \textbf{Description}
-     & \textit{AskUbuntu}
-     & \textit{Android SE}
+     & \textsf{AskUbuntu}
+     & \textsf{Android SE}
      \\
      \textbf{Total \# of questions}
      & 167763
@@ -233,7 +233,7 @@ We describe here the dataset that we base our work on.
 \end{itemize}
 
 \subsection{Model}
-We model the task of in-domain question similarity as follows:
+We model the task of in-domain question similarity in the following manner
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
   \item We define a word-level deep neural network (DNN). The network takes a sequence of indices corresponding to word embeddings. We average the title and the body of each query, and use the averaged representation to compute similarity.
   \item We use word embeddings pre-trained on source domain and the Wikipedia.
@@ -294,6 +294,7 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
      \\
      \end{aligned}\right.
      \end{equation}
+     
     \begin{equation}
     \left.\begin{aligned}
      &= \sum_{i=1}^{n}L_y(G_f(x_i;\theta_f), y_i) 
@@ -307,7 +308,7 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
 \begin{figure}[h]
 \centering
 \includegraphics[width=\columnwidth]{img/adversary}
-\caption{Adversarial network for unsupervised domain adaptation investigated in this work. Image reference: Ganin et al., 2015 \protect\cite{ganin2015unsupervised}}
+\caption{Adversarial network for unsupervised domain adaptation investigated in this work. Image source: Ganin et al., 2015 \protect\cite{ganin2015unsupervised}}
 \label{fig:adversarial}
 \end{figure}
  
@@ -315,11 +316,11 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
 \centering
 \begin{tabularx}{\columnwidth}{X}
     \includegraphics[keepaspectratio, width=\columnwidth]{img/siamese_architecture}
-    \captionof{figure}{Siamese RNN. Image reference: \protect\cite{siamese}}
+    \captionof{figure}{Siamese RNN. Image source: Neculoiu et al. \protect\cite{siamese}}
    \label{fig:siamese}
    \\
     \includegraphics[width=\columnwidth]{img/doc2vec_architecture}
-    \captionof{figure}{Doc2Vec. Image reference: \protect\cite{doc2vec1}}
+    \captionof{figure}{Doc2Vec. Image source: Le et al. \protect\cite{doc2vec1}}
     \label{fig:doc2vec}
 \end{tabularx}
 \end{table}
@@ -398,7 +399,7 @@ We pose the following research questions, whose answers we investigate in this w
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
 \item \textbf{E1:} How well do deep neural encoders such as LSTM and CNN solve the task of in-domain question retrieval. How do they compare to baselines and the state of the art? What are the limitations?
 \item \textbf{E2:} How effective are deep adversarial neural methods in adapting from one domain to another to learn a common task. How do they compare to baselines and the state of the art? What are the limitations?
-\item {\color{red}\textbf{E3:} How well can a Siamese neural network architecture and $\mathsf{doc2vec}$ model question similarity tasks and whether they aid in domain adaptation.}
+\item \textbf{E3:} How well can a Siamese neural network architecture and $\mathsf{doc2vec}$ model question-similarity tasks and whether they aid in domain adaptation.
 \end{itemize}
 
 \subsection{Experiment 1}
@@ -549,7 +550,7 @@ Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of
          & \textbf{0.56}
          & \textbf{0.42}
          & \textbf{0.57}
-         & 0.66
+         & 0.65
          & \textbf{0.53}
          & \textbf{0.42}
          & \textbf{0.53}
@@ -561,7 +562,7 @@ Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of
          & \textbf{0.57}
          & \textbf{0.42}
          & \textbf{0.57}
-         & 0.67
+         & \textbf{0.67}
          & 0.48
          & \textbf{0.44}
          & \textbf{0.54}
@@ -587,12 +588,12 @@ Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of
     \cmidrule{1-1} 
     \textbf{CNN-direct}
     & 0.81
-    & 0.33
+    & 0.33 {\color{red} are these latest? cant be less than tf-idf}
     \\
     \cmidrule{1-1} 
     \textbf{LSTM-direct}
     & 0.90
-    & 0.43
+    & 0.43 {\color{red} are these latest? cant be less than tf-idf}
     \\
     \midrule
     \textbf{CNN-adversarial}
@@ -612,7 +613,7 @@ Table \ref{tab:exp1} tabulates the performance of neural encoders on the task of
     \cmidrule{1-1} 
     \textbf{doc2vec-DM}
     & 0.83
-    & 0.36
+    & 0.36 {\color{red} these are way too low as well}
     \\
     \cmidrule{1-1}
     \textbf{doc2vec-DBOW}
@@ -648,67 +649,55 @@ In the case of \textsf{doc2vec}, we consider two variations: the distributed mem
 \section{Discussion}
 \label{discussion}
 \subsection{Experiment 1}
-{\color{red} Figure \ref{fig:exp1a} (left) shows the training loss for both LSTM and CNN networks as a result of training with a learning rate decay schedule as shown in Figure \ref{fig:exp1a} (middle). The initial learning rate was set to 1e-3 and was halved every $4$ epochs. The ranking performance on the test set is summarized in Figure \ref{fig:exp1a} (right). We can see that LSTM achieves slightly higher performance in comparison to CNN. However, due to the re-current nature of LSTM it takes longer to train. From Table \ref{tab:exp1}, we can see that LSTM achieves slightly higher performance in comparison to the BM25 benchmark. In the process of hyper-parameter optimization, we discovered that average pooling (in contrast to last pooling) gives slight advantage, in additional bi-directional LSTM is able to better capture the information in the title and body of the training questions. In the case of CNN, we found that increasing the number of output channels and using tanh activation resulted in higher performance. As seen from Table \ref{tab:exp1}, both LSTM and CNN prove valuable encoding techniques for representing a query. Additional improvement could be attained using a gated CNN architecture as described in \ref{paper}. The model was performance was found to be sensitive to the choice of loss margin. By setting the margin to 0.4, we are able to attain a reduction in loss over iterations.}
+Table \ref{tab:exp1} summarizes the performance of our models on four IR-metrics. We see that both the neural models clearly beat the baseline \textsf{BM25} information retrieval approach on all metrics on the test-set by an average of 0.03 points. We find that LSTM achieves a slightly higher performance than CNN. However, due to the recurrent nature of LSTM, it takes longer to train. In the process of hyper-parameter optimization, we found average pooling to perform better. Bi-directional LSTM performed better than forward LSTM. This is justified since {\color{red}blah blah}. For the CNN, we found that increasing the number of output channels and using $tanh$ activation performed better. Figure \ref{fig:exp1_training} shows the loss for both the networks when training with a learning rate decay schedule shown in Figure \ref{fig:exp1_learning_rate}. The initial learning rate was set to 1e-3 and was halved every $4$ epochs. We found the performance to be sensitive to the choice of the loss margin. We achieved best loss reduction over iterations at margin $0.4$.{\color{red}NO NEED. THIS INFO IS CONVEYED IN THE TABLE.The ranking performance on the test set is summarized in Figure \ref{fig:exp1_ranking}.} These results suggest that LSTMs and CNNs are useful encoding techniques for representing a query. Additional improvement can be attained using a gated CNN architecture as described in \cite{lei2015semi}.
+
+\begin{table*}[ht]
+\centering
+\begin{tabularx}{\linewidth}{XXXX}
+    \includegraphics[width=0.55\columnwidth]{img/report_training_loss_part1}
+    \captionof{figure}{Training loss over epochs}
+    \label{fig:exp1_training}
+&
+   \includegraphics[width=0.55\columnwidth]{img/report_learning_rate_schedule.png}
+   \captionof{figure}{Learning rate schedule over epochs}
+   \label{fig:exp1_learning_rate}
+   
+&   \includegraphics[width=0.55\columnwidth]{img/report_da_roc_direct}
+    \captionof{figure}{ROC Direct transfer}
+   \label{fig:exp2_roc_direct_transfer}
+&
+    \includegraphics[width=0.55\columnwidth]{img/report_domain_transfer_tfidf_hist}
+    \captionof{figure}{Direct transfer - class separation}
+   \label{fig:exp2_direct_transfer}
+ \\
+    \includegraphics[width=0.55\columnwidth]{img/report_training_loss_adversarial_tot}
+    \captionof{figure}{Total loss over epochs - Adversarial network}
+    \label{fig:exp2_adversarial_loss_total}
+&
+   \includegraphics[width=0.55\columnwidth]{img/report_training_loss_adversarial_dis}
+   \captionof{figure}{Loss of the discriminator network over epochs}
+   \label{fig:exp2_adversarial_loss_discrimnator}
+&
+    \includegraphics[width=0.55\columnwidth]{img/report_da_adversarial_gradient_norm}
+    \captionof{figure}{Gradient norms - Domain classifier}
+   \label{fig:exp2_gradient_norm}
+   
+&   \includegraphics[width=0.55\columnwidth]{img/report_da_roc_part3.png}
+    \captionof{figure}{Direct transfer - Experiment 3}
+   \label{fig:exp3_siamese}
+
+\end{tabularx}
+\end{table*}
+
 
 \subsection{Experiment 2}
-{\color{red} Figure \ref{fig:exp2a} (right) shows direct domain transfer ROC AUC performance for tf-idf, LSTM and CNN models. These models form a baseline for adversarial domain transfer. Tf-idf achieves highest direct transfer AUC. Figure \ref{fig:exp2a} (left) shows the positive and negative class separation attained by the tf-idf model. This histogram is normalized since the number of negative examples in the dataset far exceeds the number of positive (similar) question pairs. We can see that by varying the threshold on the predicted label, we can attain the ROC curve shown on the right. Notice that the two classes are well-separated by the tf-idf model leading to a high AUC score.\\
-Figure \ref{fig:exp2b} (left) shows the total adversarial training loss for both LSTM and CNN models. We can see the difference in initialization of the two models by comparing the loss at epoch zero. The losses plateau after 8 epochs resulting in early stopping. Figure \ref{fig:exp2b} (right) shows the stochastic nature of the domain classifier loss. Its magnitude is much larger in comparison to the question encoder loss and therefore a small value of lambda (1e-6) is used to attenuate it. We found that AUC performance was very sensitive to the choice of lambda. We tried a range of values for lambda from 1e-3 to 1e-7 and we selected the lambda that gives highest AUC performance and leads to a non-negative total loss.\\
-Figure \ref{fig:exp2c} (left) shows the AUC performance of adversarial domain adaptation (DA). From Table \ref{tab:exp23} we can see that adversarial DA achieves highest AUC performance exceeding the tf-idf and direct transfer baselines. We also examined the weight and gradient norms of the domain classifier as shown in Figure \ref{fig:exp2c} (middle, right). We found that the gradient of the last of the 4 dense layers of the MLP is highest and the most stochastic. The effect of the learning rate schedule on the MLP parameter weights can also be seen from the stair-case in Figure \ref{fig:exp2c} (middle). 
-}
-
+Table \ref{tab:exp1} summarizes the performance of our models on the AUC(0.05) metric. The TF-IDF baseline transfer method has an AUC(0.05) score of 0.62. We see that the Direct-transfer CNN and LSTM baseline models perform better than the TF-IDF model by {\color{red}XX} points on an average. The neural models for domain adaptation clearly beat these two baselines by $0.10$ points on an average. These are encouraging results and demonstrate the robustness of the approach to domain adaptation.
+Figure \ref{fig:exp2_roc_direct_transfer} shows direct domain transfer ROC AUC performance for the three baseline models - TF-IDF, LSTM and CNN. TF-IDF achieves highest direct transfer AUC. Figure \ref{fig:exp2_direct_transfer} shows the positive and negative class separation attained by the TF-IDF model. This histogram is normalized since the number of negative examples in the dataset far exceeds the number of positive (similar) question pairs. {\color{red}\st{We can see that by varying the threshold on the predicted label, we can attain the ROC curve shown on the left. Notice that the two classes are well-separated by the tf-idf model leading to a high AUC score.}}
+Figure \ref{fig:exp2_adversarial_loss_total} shows the total adversarial training loss for the LSTM and CNN models. We see the difference in initialization of the two models by comparing the loss at epoch zero. The losses plateau after 8 epochs resulting in early stopping. Figure \ref{fig:exp2_adversarial_loss_discrimnator} shows the stochastic nature of the domain classifier loss. Its magnitude is much larger in comparison to the question encoder loss and therefore a small value of $\lambda$ ($1e$-$6$) is used to attenuate it. We found that AUC performance was very sensitive to the choice of $\lambda$. We selected the best value of lambda by sweeping between $1e$-$3$ to $1e$-$7$. We also examined the gradient norms of the domain classifier as shown in Figure \ref{fig:exp2_gradient_norm}. We found the gradient of the last among the 4 dense layers of the MLP to have be the highest and most stochastic. \st{The effect of the learning rate schedule on the MLP parameter weights can also be seen from the staircase in Figure. HAVE REMOVED THIS FIG OWING TO SPACE. NOT A LOT OF VALUE ADD}
 \subsection{Experiment 3}
-{\color{red} Figure \ref{fig:exp3} shows the ROC AUC performance of the Siamese RNN and doc2vec models. From Table \ref{tab:exp23}, we can see that the performance of these two techniques performs less favorably in comparison to adversarial domain transfer. Furthermore, the DM architecture of doc2vec is slightly better in comparison to DBOW which is also reported in the original paper \cite{doc2vec_paper}. The main difference between the Siamese RNN and the LSTM encoding network is the contrastive loss function and the additional dense layers introduced in the Siamese RNN network to aid in the domain transfer. We can see that direct transfer LSTM outperforms Siamese RNN suggesting that further optimization can be done to improve the Siamese RNN network performance.}
+Figure \ref{fig:exp3_siamese} shows the ROC AUC performance of the Siamese RNN and \textsf{doc2vec} models. From Table \ref{tab:exp23}, we can see that the performance of these two techniques performs less favorably in comparison to adversarial domain transfer. Further, the DM architecture of \textsf{doc2vec} is slightly better in comparison to DBOW, which is also reported in the original paper \cite{doc2vec_paper}. The main difference between the Siamese RNN and the LSTM encoding network is the contrastive loss function and the additional dense layers introduced in the Siamese RNN network to aid in the domain transfer. We can see that direct transfer LSTM outperforms Siamese RNN suggesting that further optimization can be done to improve its performance.
 
-
-\begin{figure*}[h]
-\begin{tabular}{ccc}
-    \includegraphics[width=0.7\columnwidth]{img/report_training_loss_part1.png}
-&   \includegraphics[width=0.7\columnwidth]{img/report_learning_rate_schedule.png}
-&   \includegraphics[width=0.7\columnwidth]{img/report_ranking_performance.png}
-\end{tabular}
-\label{fig:exp1a}
-\caption{Results from Experiment 1}
-\end{figure*}
-
-\begin{figure*}[h]
-\begin{tabular}{cc}
-    \includegraphics[width=\columnwidth]{img/report_domain_transfer_tfidf_hist.png}
-&   \includegraphics[width=\columnwidth]{img/report_da_roc_direct.png}
-\end{tabular}
-\label{fig:exp2a}
-\caption{Results from Experiment 2: direct transfer}
-\end{figure*}
-
-
-\begin{figure*}[h]
-\begin{tabular}{cc}
-    \includegraphics[width=\columnwidth]{img/report_training_loss_adversarial_tot.png}
-&   \includegraphics[width=\columnwidth]{img/report_training_loss_adversarial_dis.png}
-
-\end{tabular}
-\label{fig:exp2b}
-\caption{Results from Experiment 2: adversarial loss}
-\end{figure*}
-
-\begin{figure*}[h]
-\begin{tabular}{ccc}
-    \includegraphics[width=0.7\columnwidth]{img/report_da_roc_adversarial_3.png}
-&   \includegraphics[width=0.7\columnwidth]{img/report_da_adversarial_weight_norm.png}
-&   \includegraphics[width=0.7\columnwidth]{img/report_da_adversarial_gradient_norm.png}
-\end{tabular}
-\label{fig:exp2c}
-\caption{Results from Experiment 2: ROC, weight and gradient norms}
-\end{figure*}
-
-\begin{figure*}[h]
-\begin{tabular}{c}
-    \includegraphics[width=\columnwidth]{img/report_da_roc_part3.png}
-\end{tabular}
-\label{fig:exp3}
-\caption{Results from Experiment 3}
-\end{figure*}
-
-
+\section{CONCLUSION}
 
 
 %ACKNOWLEDGEMENTS are optional
