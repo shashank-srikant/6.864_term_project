@@ -24,6 +24,7 @@
 \usepackage{enumitem}
 \usepackage{soul}
 \usepackage{tabularx}
+\usepackage[skip=1ex]{caption}
 
 \begin{document}
 
@@ -149,18 +150,26 @@ This study demonstrates the relevance of neural techniques in a critical NLP tas
 This work is organized into the following sections - Section \ref{related} discusses related work in this field. Sections \ref{in_domain}, \ref{domain_adapt},  \ref{other_techniques} discuss various techniques to model in-domain and domain adaptation tasks for the given problem. Section \ref{experiments} discusses the experiment setup and the results. Section \ref{discussion} concludes our work.
 
 
-\begin{figure*}[h]
+\begin{table*}[ht]
 \centering
-\begin{tabular}{cc}
-    \includegraphics[width=\columnwidth]{img/question_len_hist}
-&   \includegraphics[width=\columnwidth]{img/similar}
-\\
+\begin{tabularx}{\linewidth}{XX}
+    \includegraphics[width=\columnwidth]{img/hist_dataset1} 
+    \captionof{figure}{\textit{Ask Ubuntu} dataset description}
+    \label{fig:his1}
+    
+&   \includegraphics[width=\columnwidth]{img/hist_dataset2}
+    \captionof{figure}{\textit{Android} dataset description}
+    \label{fig:his2}
+    \\
    \includegraphics[width=\columnwidth]{img/cnn}
-&   \includegraphics[width=\columnwidth]{img/lstm}
-\end{tabular}
-\label{fig:len_hist}
-\caption{Summary of the \textit{Ask Ubuntu} dataset}
-\end{figure*}
+   \captionof{figure}{CNN architecture}
+   \label{fig:cnn}
+   
+&  \includegraphics[width=\columnwidth]{img/lstm}
+   \captionof{figure}{LSTM architecture}
+   \label{fig:lstm}
+\end{tabularx}
+\end{table*}
 
 \section{Related work}
 \label{related}
@@ -178,31 +187,36 @@ Multiple methods perform unsupervised domain adaptation by matching the feature 
 We first explore the task of question similarity by training a domain-specific classifier. The domain we have explored in this work involves the questions and answers asked on \textit{Ask Ubuntu}. The dataset for this task was curated by \cite{lei2015semi}. 
 
 \begin{table}[h]
-\begin{tabular}{l|r|r}
+\begin{tabular}{l|l|l}
      
      & $\mathsf{source} (\mathcal{D_S})$
      & $\mathsf{target} (\mathcal{D_T})$
      \\
      \toprule
-     Description
+     \textbf{Description}
      & \textit{AskUbuntu}
      & \textit{Android SE}
      \\
-     \# of sentences
-     & 40
-     & 50
+     \textbf{Total \# of questions}
+     & 167763
+     & 42970
      \\
-     \# of stop words 
-     & 50
-     & 90
+     \textbf{Avg words/title (SD)}
+     & 6 (2.5)
+     & 9 (3.9)
      \\
-     mean word length - title
-     & 299
-     & 300
+     \textbf{Avg words/body (SD)}
+     & 92 (210.6)
+     & 69 (24.1)
      \\
-     mean word length - body
-     & 299
-     & 300
+     \textbf{\# unique queries in train-set}
+     & 12724
+     & NA
+     \\
+     \textbf{\# unique queries in test-set}
+     & 200
+     & 1148
+     
 \end{tabular}
 \caption{Summary statistics of our dataset}
 \label{tab:dataset}
@@ -212,10 +226,10 @@ We first explore the task of question similarity by training a domain-specific c
 We describe here the dataset that we base our work on.
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
 \item The \textit{Ask Ubuntu} dataset consists of questions and answers related to problems people face in Ubuntu, the Linux operating system
-\item Each query has two components - a title and main body. The average title length is {\color{red} XX} words and the average body length is {\color{red} YY words} long. Figure \ref{fig:len_hist} shows the distribution of word lengths
+\item Each query has two components - a title and main body. The average title length is 6 words and the average body length is 92 words long after removing stop-words. Figure \ref{fig:his1} shows the distribution of word lengths
 \item Each query is associated with a few ($<10$) positive (similar) questions and $100$ randomly drawn questions from the corpus which serve as negative (dissimilar) questions.
-\item The dataset contained 110K such queries to train on.
-\item Each query-question pair is also associated with its $\mathsf{BM25 scores}$ provided by Apache Lucene. This served as a baseline in our experiments.
+\item The dataset contained a total of $167$K questions. Of these, $12724$ were used as queries to train on.
+\item Each query-positive and query-negative pair is also associated with its $\mathsf{BM25 scores}$ provided by Apache Lucene. This served as a baseline in our experiments.
 \end{itemize}
 
 \subsection{Model}
@@ -236,58 +250,65 @@ where $\delta(.,.)$ denotes a non-negative margin. We set $\delta(p, p^+_i)$ to 
 \end{itemize}
 
 \subsection{CNN}
-We describe the CNN architecture implemented in this work. We detail the inputs to the different layers of the network, which should help illustrate the architecture.
+Figure \ref{fig:cnn} illustrates the CNN architecture implemented in this work. We detail the inputs to the different layers of the network here.
 We define a CNN with the following layers -
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
 \item \textbf{Input vector $\mathbf{X}$} of dimensions: ($\mathbf{B}$, $\mathbf{W}$) ($\mathbf{B}$: batch size, $\mathbf{W}$: max \# of words in sentence in batch)
-\item \textbf{Embedding layer} Pass $\mathbf{X}$ through embeddings layer. Resulting dimension: ($\mathbf{B}$, $\mathbf{W}$, $\mathbf{D}$) ($\mathbf{D}$: \# of embeddings per word)
-\item \textbf{Convolution, ReLU} Pass the above input through a convolution layer and then through ReLU. Resulting dimension: ($\mathbf{B}$, $\mathbf{K}$, $\mathbf{Y}$)($\mathbf{K}$: Depth of filter, i.e. \# of filters of given height, $\mathbf{Y}$: \# of values sliding the filter over the input)
-\item \textbf{Pooling} Pass through mean pooling. Resulting dimension: ($\mathbf{B}$, $\mathbf{K}$)
+\item \textbf{Embedding layer} Looks up word embeddings of indices in $\mathbf{X}$. Resulting dimension: ($\mathbf{B}$, $\mathbf{W}$, $\mathbf{D}$) ($\mathbf{D}$: \# of embeddings per word)
+\item \textbf{Convolution, ReLU} A convolution layer and then through ReLU is applied to $\mathbf{X}$. Resulting dimension: ($\mathbf{B}$, $\mathbf{K}$, $\mathbf{Y}$)($\mathbf{K}$: Depth of filter, i.e. \# of filters of given height, $\mathbf{Y}$: \# of values sliding the filter over the input)
+\item \textbf{Pooling} Mean pooling of convolution layers. Resulting dimension: ($\mathbf{B}$, $\mathbf{K}$)
 \item The resulting encoded embedding of dimension ($\mathbf{B}$, $\mathbf{K}$) for $\mathbf{B}$ words in a given batch.
 \end{itemize}
 
 \subsection{LSTM}
-{\color{red} 
-We describe the LSTM architecture implemented in this work. We detail the inputs to the different layers of the network, which should help illustrate the architecture.
-We define the LSTM with the following layers -
+Figure \ref{fig:lstm} illustrates the LSTM architecture implemented in this work. We detail the inputs to the different layers of the network here.
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
-\item \textbf{Input vector $\mathbf{X}$} with dimensions: [$\mathbf{B}$, $\mathbf{W}$, $\mathbf{D}$], where $\mathbf{B}$ is the batch size, $\mathbf{W}$ is max number of words, and $\mathbf{D}$ is the embedding dimension
-\item \textbf{Embedding layer} is used to look up word embeddings given  the indices $\mathbf{X}$.
-\item \textbf{LSTM layer} returns LSTM output used for average pooling as well as the hidden state and LSTM cell state.
+\item \textbf{Input vector $\mathbf{X}$} of dimensions: [$\mathbf{B}$, $\mathbf{W}$, $\mathbf{D}$], where $\mathbf{B}$ is the batch size, $\mathbf{W}$ is max number of words, and $\mathbf{D}$ is the embedding dimension
+\item \textbf{Embedding layer} Looks up word embeddings of indices in $\mathbf{X}$.
+\item \textbf{LSTM layer} returns the hidden state and LSTM cell state.
 \item \textbf{Pooling} Average pooling is used to average the outputs of the bi-directional LSTM producing a summary vector of dimension [$\mathbf{B}$, $2\times \mathbf{H}$], where $\mathbf{H}$ is the hidden size. 
 \end{itemize}
-}
+
+
 \section{Domain Adaptation (DA)}
 \label{domain_adapt}
  We use adversarial training techniques \cite{ganin2015unsupervised} to adapt to a domain having no labeled data, having trained a model on a domain with labeled data. In this section and the next, we describe the dataset we worked on, the architecture for the adversarial model we use, and other models for DA we tried.
 
 
 \subsection{Dataset}
-We worked with two datasets, one as our $\mathsf{source}$ domain, wherein we had labeled data and another as our $\mathsf{target}$ domain, where we had no labeled data. The task on both these datasets was the same - to predict similarity between questions. The $\mathsf{source}$ domain in our experiments was the \textit{AskUbuntu} dataset, described in the previous section. The $\mathsf{target}$ domain was the \textit{Android Stack Exchange}, a question-answering site on Android-related issues. Table \ref{tab:dataset} describes the summary statistics of this dataset. For the $\mathsf{target}$ domain, we had {\color{red} XX} sentences to test. Each query was expert-annotated with similar and dissimilar queries they corresponded to. A TF-IDF representation was used as a baseline for evaluating domain adaptation.
+We worked with two datasets, one as our $\mathsf{source}$ domain, wherein we had labeled data and another as our $\mathsf{target}$ domain, where we had no labeled data. The task on both these datasets was the same - to predict similarity between questions. The $\mathsf{source}$ domain in our experiments was the \textit{AskUbuntu} dataset, described in the previous section. The $\mathsf{target}$ domain was the \textit{Android Stack Exchange}, a question-answering site on Android-related issues. Table \ref{tab:dataset} describes the summary statistics of this dataset. No training set was available for this dataset - all questions were divided into validation and test sets. Each query was again associated with a few ($<10$) positive and $100$ negative questions. These were expert-annotated. The final model was tested on 1148 unique queries.
+
 \subsection{Model}
 We model this task of unsupervised domain adaptation using a neural adversarial approach \cite{ganin2015unsupervised}. The core idea is as follows - 
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
     \item We define an encoder which takes in data from the $\mathsf{source}$ domain and learns a representation which predicts the similarity for tasks in its own domain, given that we have labels for this domain. This is similar to the in-domain learning described in the previous section. We refer to this network as the \textit{encoder network} here on.
     \item While the primary goal of predicting $\mathcal{Y}_\mathsf{source}$ remains, we define an adversarial objective to guide the direction of the embeddings encoded by the encoder network in a way to make them abstract enough to be able to discriminate $\mathcal{Y}_\mathsf{target}$ as well.
-    \item We do this by setting up another network to learn this adversarial objective. We refer to this network as \textit{adversarial network} here on. We set the goal of the adversarial network to predict whether a given data-point input to it originates from either the $\mathsf{source}$ or $\mathsf{target}$ dataset. The idea behind setting up this objective is that if the origin of the input data is being discriminated well by the adversarial network, then the features are still specific enough to discriminate between the two datasets. What we want is to however have an abstract enough feature space which, in spite of predicting the labels of the $\mathsf{source}$ well, is unable to distinguish between the $\mathsf{source}$ and $\mathsf{target}$ dataset.
-    \item The objective of the adversarial network is set up in a way to propogate a negative weight to the encoder whenever it successfully discriminates between $\mathsf{source}$ and $\mathsf{target}$. This ensures the successful transfer of the encoded embeddings to the $\mathsf{target}$ domain. Figure \ref{fig:adversary} depicts this arrangement.
-    \item {\color{red} Let $\theta_f$ be the parameters of the question encoder (generator) $G_f$ and $\theta_d$ be the parameters of the domain classifier (discriminator). Then we can write down our loss objective as:
-    \begin{eqnarray}
-     \min E(\theta_f, \theta_d) = \sum_{i=1}^{n}L_{y}^{i}(\theta_f) - \lambda^{t}\sum_{i=1}^{n}L_{d}^{i}(\theta_f, \theta_d) = \\
-     \sum_{i=1}^{n}L_y(G_f(x_i;\theta_f), y_i) 
-      - \lambda^{t} \sum_{i=1}^{n}L_d(G_d(G_f(x_i;\theta_f), \theta_d), y_i)
-    \end{eqnarray}
-    where $L_y(\theta_f)$ is the multi-margin loss and $L_d(\theta_f, \theta_d)$ is the binary cross-entropy loss. Thus, we want to minimize the multi-margin loss and maximize cross-entropy loss (confusion of the domain classifier) during adversarial training. At the same time, we want the discriminator to be accurate in domain classification. We can accomplish this with a single back-propagation step by minimizing the total loss $E(\theta_f, \theta_d)$ above and reversing the gradient of the domain classifier during the weight update, e.g. by setting a negative learning rate.
-    }
     
+    \item We do this by setting up another network to learn this adversarial objective. We refer to this network as \textit{adversarial network} here on. We set the goal of the adversarial network to predict whether a given data-point input to it originates from either the $\mathsf{source}$ or $\mathsf{target}$ dataset. The idea behind setting up this objective is that if the origin of the input data is being discriminated well by the adversarial network, then the features are still specific enough to discriminate between the two datasets. What we want is to however have an abstract enough feature space which, in spite of predicting the labels of the $\mathsf{source}$ well, is unable to distinguish between the $\mathsf{source}$ and $\mathsf{target}$ dataset.
+    \item The objective of the adversarial network is set up in a way to propagate a negative weight to the encoder whenever it successfully discriminates between $\mathsf{source}$ and $\mathsf{target}$. This ensures the successful transfer of the encoded embeddings to the $\mathsf{target}$ domain. Figure \ref{fig:adversarial} depicts this arrangement.
+    
+    \item  Specifically, let $\theta_f$ be the parameters of the question encoder (generator) $G_f$ and $\theta_d$ be the parameters of the domain classifier (discriminator). The loss objective then is defined as:
+    \begin{equation}
+    \left.\begin{aligned}
+     \min E(\theta_f, \theta_d) &= \sum_{i=1}^{n}L_{y}^{i}(\theta_f) - \lambda^{t}\sum_{i=1}^{n}L_{d}^{i}(\theta_f, \theta_d)
+     \\
+     \end{aligned}\right.
+     \end{equation}
+    \begin{equation}
+    \left.\begin{aligned}
+     &= \sum_{i=1}^{n}L_y(G_f(x_i;\theta_f), y_i) 
+      - \lambda^{t} \sum_{i=1}^{n}L_d(G_d(G_f(x_i;\theta_f), \theta_d), y_i)
+    \end{aligned}\right.
+    \end{equation}
+    where $L_y(\theta_f)$ is the multi-margin loss and $L_d(\theta_f, \theta_d)$ is the binary cross-entropy loss. During adversarial training, we jointly minimize the multi-margin loss and maximize cross-entropy loss. We accomplish this with a single back-propagation step by minimizing the total loss $E(\theta_f, \theta_d)$ and reversing the gradient of the domain classifier during the weight update, e.g. by setting a negative learning rate.
 \end{itemize}
 
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=\columnwidth]{img/adversary.png}
-\label{fig:adversary}
+\includegraphics[width=\columnwidth]{img/adversary}
 \caption{Adversarial network for unsupervised domain adaptation investigated in this work. Image reference: Ganin et al., 2015 \protect\cite{ganin2015unsupervised}}
+\label{fig:adversarial}
 \end{figure}
  
 
@@ -296,7 +317,7 @@ We model this task of unsupervised domain adaptation using a neural adversarial 
 We explored two other techniques to carry out unsupervised domain transfer - $\textsf{doc2vec}$ \cite{doc2vec1} and Siamese recurrent networks \cite{siamese}. We describe each briefly here:
 \begin{itemize}[topsep=0pt,itemsep=-1ex,partopsep=1ex,parsep=1ex]
 {\color{red}
-\item $\textbf{doc2vec}$. A doc2vec model was proposed by Le and Mikolov (2014) as an extension of word2vec to learn fixed-length feature representations from variable-length pieces of texts, such as sentences, paragraphs, and documents. Thus, each document is represented by a dense vector which is trained to predict words in the document. There are two doc2vec architectures: Distributed Memory (DM) and Continous Bag of Words (CBOW) as shown in Figure{}. A doc2vec model introduces a document vector to learn a predictive context similar to word2vec. The DM model acts as memory that remembers what is missing from the current context. While the word vectors represent the concept of a word, the document vector intends to represent the concept of a document. The CBOW model samples a text window, then samples a random word from the text window and forms a classification task of predicting the random word given the text window.
+\item $\textbf{doc2vec}$. A doc2vec model was proposed by Le and Mikolov (2014) as an extension of word2vec to learn fixed-length feature representations from variable-length pieces of texts, such as sentences, paragraphs, and documents. Thus, each document is represented by a dense vector which is trained to predict words in the document. There are two doc2vec architectures: Distributed Memory (DM) and Continuous Bag of Words (CBOW) as shown in Figure{}. A doc2vec model introduces a document vector to learn a predictive context similar to word2vec. The DM model acts as memory that remembers what is missing from the current context. While the word vectors represent the concept of a word, the document vector intends to represent the concept of a document. The CBOW model samples a text window, then samples a random word from the text window and forms a classification task of predicting the random word given the text window.
 }
 \item \textbf{Siamese RNN} 
 {\color{red} Siamese neural networks \ref{} are characterized by shared weights and are trained with a \textit{contrastive loss function} that differentiates between the inputs. Thus, siamese nets are well-suited for computing similarity between a query and a candidate question. We use a shared bi-directional LSTM as an input encoder and add several fully connected layers for domain adaptation. The siamese architecture is shown in Figure \ref{}. The contrastive loss function $L(x_1,x_2,y)$ is defined as
