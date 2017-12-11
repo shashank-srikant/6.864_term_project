@@ -82,7 +82,7 @@
 \date{30 July 1999}
 \maketitle
 \begin{abstract}
-Content on the internet grows at an exponential rate. Given this growth, finding relevant information accurately becomes a critical task for the NLP community to address. More so, with this rapid growth, curating labeled datasets to build models for the wide variety of content available on the internet has become extremely time and resource intensive. In this work, we explore whether neural models are able to successfully model content similarity and retrieval tasks, and whether they can transfer knowledge from one domain, where supervised labels are available, to a domain with no available labels. Specifically, we explore content similarity in online discussion forums, where we explore the following questions - a. how effectively can neural approaches model question-answer retrieval tasks, which is, given a question and answer pair present on an online discussion forum, how effectively can neural approaches find similar pairs on that forum. b. Given a model of question-answer similarity in one online discussion forum, how effective are neural approaches in transferring that knowledge to a new, loosely related domain. In this work, we explore a baseline approach of modeling question similarity tasks on the popular Stack Exchange online community \textit{AskUbuntu}. We show how neural architectures like LSTMs and CNNs outperform traditional approaches in information retrieval. Additionally, and importantly, we explore the problem of transferring these models to detect question-answer similarity on \textit{Android Stack Exchange},  a similar yet different online discussion community where members troubleshoot Android related problems. We show how neural domain adaptation techniques successfully beat baseline IR techniques and direct neural transfer techniques. We also discuss some limitations and challenges in using such architectures.
+Content on the internet grows at an exponential rate. Given this growth, finding relevant information accurately becomes a critical task for the NLP community to address. More so, with this rapid growth, curating labeled datasets to build models for the available wide variety of content has become extremely time and resource intensive. In this work, we explore whether neural models are able to successfully model content similarity and retrieval tasks, and whether they can transfer knowledge from one domain, where supervised labels are available, to a domain with no such labels. Specifically, we explore content similarity in online discussion forums, where we explore the following questions - a. how effectively can neural approaches model question-answer retrieval tasks. Given a question and answer pair present on an online discussion forum, such a retrieval task finds similar pairs on that forum. b. Given a model of question-answer similarity in one online discussion forum, how effective are neural approaches in transferring that knowledge to a new, loosely related domain. In this work, we explore a baseline approach of modeling question similarity tasks on the popular Stack Exchange online community \textit{Ask Ubuntu}. We show how neural architectures like LSTMs and CNNs outperform traditional approaches in information retrieval. Additionally, and importantly, we explore the problem of transferring these models to detect question-answer similarity on \textit{Android Stack Exchange},  a similar yet different online discussion community where members troubleshoot Android related problems. We show how neural domain adaptation techniques successfully beat baseline transfer techniques. We also discuss some limitations and challenges in using such architectures.
 \end{abstract}
 
 \begin{table*}[th]
@@ -141,7 +141,7 @@ The problem of text similarity, and specifically, similarity of short queries or
 
 Another relevant and pressing concern which such an explosion and variety of content has introduced is the increased cost of building predictive NLP, NLU models which cater to such content. The variety in content requires building a model from scratch, irrespective of how closely related the content may have been to a previously built model. For instance, if we were to model the reviews written for movies, we would have to reinvest effort and time in modeling reviews written for another domain, say, food or hotels. In spite there being conceptual, semantic similarities between the tasks of reviewing movies and reviewing food, models have to be created anew. And each such modeling exercise demands a large repository of curated, preferably labeled data, which most often is not feasible to put together. The pressing challenge such a variety of content has created is to be able to learn with minimal supervision, and from loosely related datasets.
 
-In this work, we investigate two problems - one, to model question-similarity tasks using state of the art techniques in neural modeling and two, transfer those models to a loosely related, yet equally rich domain under the constraint of having no supervised information on that new domain. Specifically, we explore the problem of finding similar question-answer pairs on the popular \textit{Ask Ubuntu Stack Exchange}.\footnote{https://askubuntu.com} This discussion forum focuses on troubleshooting queries on Ubuntu, the popular open-source operating system. In addition to  learning models to find relevant question-answer pairs on this forum, we also use this domain to transfer knowledge onto modeling question-answer similarity in \textit{Android Stack Exchange}.\footnote{https://android.stackexchange.com} This is an online community, similar in setup and structure to \textit{Ask Ubuntu}, wherein short queries and corresponding answers on Android-related troubleshooting are present.
+In this work, we investigate two problems - one, to model question-similarity tasks using state of the art techniques in neural modeling and two, transfer those models to a loosely related, yet equally rich domain, under the constraint of having no supervised information on that new domain. Specifically, we explore the problem of finding similar question-answer pairs on the popular \textit{Ask Ubuntu Stack Exchange}.\footnote{https://askubuntu.com} This discussion forum focuses on troubleshooting queries on Ubuntu, the popular open-source operating system. In addition to  learning models to find relevant question-answer pairs on this forum, we also use this domain to transfer knowledge onto modeling question-answer similarity in \textit{Android Stack Exchange}.\footnote{https://android.stackexchange.com} This is an online community, similar in setup and structure to \textit{Ask Ubuntu}, wherein short queries and corresponding answers on Android-related troubleshooting are present.
 
 In this work, we investigate how state of the art neural architectures for NLP applications perform on the task of question similarity. Traditionally, text similarity tasks were solved using information retrieval techniques like building an indexer and applying string search over the indexed corpus. A lot of variations to this general strategy have been explored over the years. We study how more recent techniques like RNNs and CNNs, which have shown to successfully model a variety of NLP tasks, solve the question retrieval problem. For the domain adaptation task, we explore adversarial training techniques \cite{ganin2015unsupervised, lei2015semi} as well as the performance on different architectures like $\textsf{Doc2Vec}$ \cite{doc2vec1} and Siamese neural networks \cite{siamese}.
 
@@ -187,33 +187,33 @@ Multiple methods perform unsupervised domain adaptation by matching the feature 
 We first explore the task of question similarity by training a domain-specific classifier. The domain we have explored in this work involves the questions and answers asked on \textit{Ask Ubuntu}. The dataset for this task was curated by \cite{lei2015semi}. 
 
 \begin{table}[h]
-\begin{tabular}{l|l|l}
+\begin{tabular}{l|r|r}
      
      & $\mathsf{source} (\mathcal{D_S})$
      & $\mathsf{target} (\mathcal{D_T})$
      \\
      \toprule
-     \textbf{Description}
+     Description
      & \textsf{AskUbuntu}
      & \textsf{Android SE}
      \\
-     \textbf{Total \# of questions}
+     Total \# of questions
      & 167763
      & 42970
      \\
-     \textbf{Avg words/title (SD)}
+     Avg words/title (std dev)
      & 6 (2.5)
      & 9 (3.9)
      \\
-     \textbf{Avg words/body (SD)}
+     Avg words/body (std dev)
      & 92 (210.6)
      & 69 (24.1)
      \\
-     \textbf{\# unique queries in train-set}
+     \# unique queries in train-set
      & 12724
      & NA
      \\
-     \textbf{\# unique queries in test-set}
+     \# unique queries in test-set
      & 200
      & 1148
      
@@ -338,7 +338,7 @@ D_w &=& \sqrt{[RNN(x_1) - RNN(x_2)]^2}
 \end{eqnarray}
 where $y$ is a binary label equal to $0$ for similar inputs (in which case we want to minimize the distance $D_w$) and equal to $1$ for dissimilar inputs (in which case we want to maintain a margin $\Delta$). The distance $D_w$ is a pairwise Euclidean distance between RNN encodings of the inputs $x_1$ and $x_2$. In order for the Siamese RNN to generalize to domain adaptation, we include dropout\cite{srivastava2014dropout} in between the dense layers with keep probability equal to $0.5$. Alternatively, \textit{variational dropout}\cite{kingma2015variational} can be used to tune the keep probability to improve generalization performance.
 
-\item $\textsf{doc2vec}$. A \textsf{doc2vec} model was proposed by Le and Mikolov \cite{doc2vec1} as an extension of word2vec to learn fixed-length feature representations from variable-length pieces of texts, such as sentences, paragraphs, and documents. Thus, each document is represented by a dense vector which is trained to predict words in the document. While the word vectors represent the concept of a word, the document vector intends to represent the concept of a document. There are two doc2vec architectures: Distributed Memory (DM) and Continuous Bag of Words (CBOW) as shown in Figure \ref{fig:doc2vec}. The DM model acts as memory that remembers what is missing from the current context. The CBOW model samples a text window, then samples a random word from the text window and forms a classification task of predicting the random word given the text window. Such a document vector representation can likely model both domains in a domain-adaptation task.
+\item \textbf{$\textsf{doc2vec}$} A \textsf{doc2vec} model was proposed by Le and Mikolov \cite{doc2vec1} as an extension of word2vec to learn fixed-length feature representations from variable-length pieces of texts, such as sentences, paragraphs, and documents. Thus, each document is represented by a dense vector which is trained to predict words in the document. While the word vectors represent the concept of a word, the document vector intends to represent the concept of a document. There are two doc2vec architectures: Distributed Memory (DM) and Continuous Bag of Words (CBOW) as shown in Figure \ref{fig:doc2vec}. The DM model acts as memory that remembers what is missing from the current context. The CBOW model samples a text window, then samples a random word from the text window and forms a classification task of predicting the random word given the text window. Such a document vector representation can likely model both domains in a domain-adaptation task.
 \end{itemize}
 
 
@@ -698,7 +698,7 @@ Figure \ref{fig:exp2_adversarial_loss_total} shows the total adversarial trainin
 Figure \ref{fig:exp3_siamese} shows the ROC AUC performance of the Siamese RNN and \textsf{doc2vec} models. From Table \ref{tab:exp23}, we can see that the performance of these two techniques performs less favorably in comparison to adversarial domain transfer. Further, the DM architecture of \textsf{doc2vec} is slightly better in comparison to DBOW, which is also reported in the original paper \cite{doc2vec_paper}. The main difference between the Siamese RNN and the LSTM encoding network is the contrastive loss function and the additional dense layers introduced in the Siamese RNN network to aid in the domain transfer. We can see that direct transfer LSTM outperforms Siamese RNN suggesting that further optimization can be done to improve its performance.
 
 \section{CONCLUSION}
-
+We explore the task of question retrieval in online discussion forums. Given a question-answer pair, we employ neural techniques to detect similar such pairs on the forums. We find that neural techniques model this task well and outperform traditional IR-based approaches in finding similar content. Another area explored in this work is that of unsupervised domain transfer. Given a labeled dataset of question-answer pairs from a discussion forum on one topic, we evaluate how well neural approaches are able to transfer this knowledge of similarity detection onto question-answer pairs on another topic. No labeled information is available for the pairs on the new topic. We find that neural adversarial approaches to domain transfer perform better than baseline domain transfer approaches. We also explore other architectures for domain adaptation. We find that Siamese RNN, although suited for domain-adaptation-like tasks, does not perform as well as the adversarial setup. Further, \textsf{doc2vec} is unable to capture the feature-space which the adversarial network trains, rendering them unsuitable for this domain adaptation task. The simplicity in the architecture, the lack of any feature engineering required, and relatively low training time make adversarial neural models worthy of further study and possible adoption in industrial systems for such tasks. 
 
 %ACKNOWLEDGEMENTS are optional
 \section{Acknowledgements}
