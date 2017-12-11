@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 import seaborn as sns
+import matplotlib
 import matplotlib.pyplot as plt
 
 import ConfigParser
@@ -12,6 +13,13 @@ config = ConfigParser.ConfigParser()
 config.readfp(open(r'config.ini'))
 SAVE_PATH = config.get('paths', 'save_path')
 
+matplotlib.rcParams.update({'font.size': 32})
+matplotlib.rcParams.update({'axes.titlesize': 24})
+matplotlib.rcParams.update({'axes.labelsize': 16})
+matplotlib.rcParams.update({'xtick.labelsize': 16})
+matplotlib.rcParams.update({'ytick.labelsize': 16})
+matplotlib.rcParams.update({'legend.fontsize': 16})
+matplotlib.rcParams.update({'figure.titlesize': 20})
 
 #load all data
 filename = SAVE_PATH + 'figures_cnn.dat' 
